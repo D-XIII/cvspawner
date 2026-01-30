@@ -11,6 +11,19 @@ interface CVPreviewProps {
   id?: string
 }
 
+// Using inline styles with hex colors for html2canvas compatibility
+// (Tailwind v4 uses lab() colors which html2canvas doesn't support)
+const colors = {
+  white: '#ffffff',
+  gray900: '#111827',
+  gray800: '#1f2937',
+  gray700: '#374151',
+  gray600: '#4b5563',
+  gray500: '#6b7280',
+  gray300: '#d1d5db',
+  gray100: '#f3f4f6',
+}
+
 export default function CVPreview({ profile, experiences, formations, skills, id = 'cv-preview' }: CVPreviewProps) {
   const formatDate = (date: string | Date) => {
     return new Date(date).toLocaleDateString('fr-FR', { month: 'short', year: 'numeric' })
@@ -40,8 +53,11 @@ export default function CVPreview({ profile, experiences, formations, skills, id
   return (
     <div
       id={id}
-      className="bg-white text-gray-900 p-8 shadow-lg"
       style={{
+        backgroundColor: colors.white,
+        color: colors.gray900,
+        padding: '32px',
+        boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
         width: '210mm',
         minHeight: '297mm',
         maxHeight: '297mm',
@@ -52,87 +68,87 @@ export default function CVPreview({ profile, experiences, formations, skills, id
     >
       {/* Header */}
       {profile && (
-        <header className="border-b-2 border-gray-800 pb-4 mb-4">
-          <h1 className="text-2xl font-bold text-gray-900">
+        <header style={{ borderBottom: `2px solid ${colors.gray800}`, paddingBottom: '16px', marginBottom: '16px' }}>
+          <h1 style={{ fontSize: '1.5rem', fontWeight: 'bold', color: colors.gray900 }}>
             {profile.firstName} {profile.lastName}
           </h1>
           {profile.title && (
-            <p className="text-lg text-gray-600 mt-1">{profile.title}</p>
+            <p style={{ fontSize: '1.125rem', color: colors.gray600, marginTop: '4px' }}>{profile.title}</p>
           )}
 
-          <div className="flex flex-wrap gap-4 mt-3 text-xs text-gray-600">
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px', marginTop: '12px', fontSize: '0.75rem', color: colors.gray600 }}>
             {profile.email && (
-              <span className="flex items-center gap-1">
-                <Mail className="w-3 h-3" />
+              <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <Mail style={{ width: '12px', height: '12px' }} />
                 {profile.email}
               </span>
             )}
             {profile.phone && (
-              <span className="flex items-center gap-1">
-                <Phone className="w-3 h-3" />
+              <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <Phone style={{ width: '12px', height: '12px' }} />
                 {profile.phone}
               </span>
             )}
             {profile.address && (
-              <span className="flex items-center gap-1">
-                <MapPin className="w-3 h-3" />
+              <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <MapPin style={{ width: '12px', height: '12px' }} />
                 {profile.address}
               </span>
             )}
             {profile.linkedin && (
-              <span className="flex items-center gap-1">
-                <Linkedin className="w-3 h-3" />
+              <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <Linkedin style={{ width: '12px', height: '12px' }} />
                 LinkedIn
               </span>
             )}
             {profile.github && (
-              <span className="flex items-center gap-1">
-                <Github className="w-3 h-3" />
+              <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <Github style={{ width: '12px', height: '12px' }} />
                 GitHub
               </span>
             )}
             {profile.website && (
-              <span className="flex items-center gap-1">
-                <Globe className="w-3 h-3" />
+              <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <Globe style={{ width: '12px', height: '12px' }} />
                 Website
               </span>
             )}
           </div>
 
           {profile.summary && (
-            <p className="mt-3 text-xs text-gray-700 leading-relaxed">
+            <p style={{ marginTop: '12px', fontSize: '0.75rem', color: colors.gray700, lineHeight: '1.625' }}>
               {profile.summary}
             </p>
           )}
         </header>
       )}
 
-      <div className="grid grid-cols-3 gap-6">
+      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '24px' }}>
         {/* Main content - 2/3 */}
-        <div className="col-span-2 space-y-4">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           {/* Experiences */}
           {experiences.length > 0 && (
             <section>
-              <h2 className="text-sm font-bold text-gray-900 uppercase tracking-wide border-b border-gray-300 pb-1 mb-3">
+              <h2 style={{ fontSize: '0.875rem', fontWeight: 'bold', color: colors.gray900, textTransform: 'uppercase', letterSpacing: '0.05em', borderBottom: `1px solid ${colors.gray300}`, paddingBottom: '4px', marginBottom: '12px' }}>
                 Experience
               </h2>
-              <div className="space-y-3">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 {experiences.map((exp) => (
                   <div key={exp._id}>
-                    <div className="flex justify-between items-start">
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                       <div>
-                        <h3 className="font-semibold text-gray-900">{exp.title}</h3>
-                        <p className="text-gray-600">{exp.company}{exp.location && ` • ${exp.location}`}</p>
+                        <h3 style={{ fontWeight: '600', color: colors.gray900 }}>{exp.title}</h3>
+                        <p style={{ color: colors.gray600 }}>{exp.company}{exp.location && ` • ${exp.location}`}</p>
                       </div>
-                      <span className="text-xs text-gray-500 whitespace-nowrap">
+                      <span style={{ fontSize: '0.75rem', color: colors.gray500, whiteSpace: 'nowrap' }}>
                         {formatDate(exp.startDate)} - {exp.current ? 'Present' : formatDate(exp.endDate!)}
                       </span>
                     </div>
-                    <p className="text-xs text-gray-700 mt-1 line-clamp-3">{exp.description}</p>
+                    <p style={{ fontSize: '0.75rem', color: colors.gray700, marginTop: '4px', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{exp.description}</p>
                     {exp.skills.length > 0 && (
-                      <div className="flex flex-wrap gap-1 mt-1">
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '4px' }}>
                         {exp.skills.slice(0, 5).map((skill) => (
-                          <span key={skill} className="text-xs px-1.5 py-0.5 bg-gray-100 text-gray-600 rounded">
+                          <span key={skill} style={{ fontSize: '0.75rem', padding: '2px 6px', backgroundColor: colors.gray100, color: colors.gray600, borderRadius: '4px' }}>
                             {skill}
                           </span>
                         ))}
@@ -147,23 +163,23 @@ export default function CVPreview({ profile, experiences, formations, skills, id
           {/* Formations */}
           {formations.length > 0 && (
             <section>
-              <h2 className="text-sm font-bold text-gray-900 uppercase tracking-wide border-b border-gray-300 pb-1 mb-3">
+              <h2 style={{ fontSize: '0.875rem', fontWeight: 'bold', color: colors.gray900, textTransform: 'uppercase', letterSpacing: '0.05em', borderBottom: `1px solid ${colors.gray300}`, paddingBottom: '4px', marginBottom: '12px' }}>
                 Education
               </h2>
-              <div className="space-y-2">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 {formations.map((form) => (
                   <div key={form._id}>
-                    <div className="flex justify-between items-start">
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                       <div>
-                        <h3 className="font-semibold text-gray-900">{form.degree}</h3>
-                        <p className="text-gray-600">{form.school}{form.location && ` • ${form.location}`}</p>
+                        <h3 style={{ fontWeight: '600', color: colors.gray900 }}>{form.degree}</h3>
+                        <p style={{ color: colors.gray600 }}>{form.school}{form.location && ` • ${form.location}`}</p>
                       </div>
-                      <span className="text-xs text-gray-500 whitespace-nowrap">
+                      <span style={{ fontSize: '0.75rem', color: colors.gray500, whiteSpace: 'nowrap' }}>
                         {formatDate(form.startDate)} - {form.current ? 'Present' : formatDate(form.endDate!)}
                       </span>
                     </div>
                     {form.description && (
-                      <p className="text-xs text-gray-700 mt-1 line-clamp-2">{form.description}</p>
+                      <p style={{ fontSize: '0.75rem', color: colors.gray700, marginTop: '4px', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{form.description}</p>
                     )}
                   </div>
                 ))}
@@ -173,24 +189,24 @@ export default function CVPreview({ profile, experiences, formations, skills, id
         </div>
 
         {/* Sidebar - 1/3 */}
-        <div className="space-y-4">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           {/* Skills */}
           {Object.keys(groupedSkills).length > 0 && (
             <section>
-              <h2 className="text-sm font-bold text-gray-900 uppercase tracking-wide border-b border-gray-300 pb-1 mb-3">
+              <h2 style={{ fontSize: '0.875rem', fontWeight: 'bold', color: colors.gray900, textTransform: 'uppercase', letterSpacing: '0.05em', borderBottom: `1px solid ${colors.gray300}`, paddingBottom: '4px', marginBottom: '12px' }}>
                 Skills
               </h2>
-              <div className="space-y-3">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 {Object.entries(groupedSkills).map(([category, categorySkills]) => (
                   <div key={category}>
-                    <h3 className="text-xs font-semibold text-gray-700 mb-1">
+                    <h3 style={{ fontSize: '0.75rem', fontWeight: '600', color: colors.gray700, marginBottom: '4px' }}>
                       {categoryLabels[category] || category}
                     </h3>
-                    <div className="flex flex-wrap gap-1">
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
                       {categorySkills.map((skill) => (
                         <span
                           key={skill._id}
-                          className="text-xs px-1.5 py-0.5 bg-gray-100 text-gray-700 rounded"
+                          style={{ fontSize: '0.75rem', padding: '2px 6px', backgroundColor: colors.gray100, color: colors.gray700, borderRadius: '4px' }}
                         >
                           {skill.name}
                         </span>
