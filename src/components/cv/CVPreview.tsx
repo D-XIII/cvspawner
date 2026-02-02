@@ -1,9 +1,8 @@
 'use client'
 
-import { Profile, Experience, Formation, Skill, TranslationLanguage } from '@/types'
+import { Profile, Experience, Formation, Skill } from '@/types'
 import { Mail, Phone, MapPin, Linkedin, Github, Globe } from 'lucide-react'
 import { CVTemplate, getTemplate } from '@/lib/cv-templates'
-import { getLabels, getCategoryLabel } from '@/lib/cv-translations'
 
 interface CVPreviewProps {
   profile: Profile | null
@@ -12,7 +11,6 @@ interface CVPreviewProps {
   skills: Skill[]
   templateId?: string
   id?: string
-  language?: TranslationLanguage
 }
 
 export default function CVPreview({
@@ -22,15 +20,19 @@ export default function CVPreview({
   skills,
   templateId = 'classic',
   id = 'cv-preview',
-  language = 'en',
 }: CVPreviewProps) {
   const template = getTemplate(templateId)
   const colors = template.colors
-  const labels = getLabels(language)
+
+  const categoryLabels: Record<string, string> = {
+    technical: 'Technical Skills',
+    soft: 'Soft Skills',
+    language: 'Languages',
+    tool: 'Tools',
+  }
 
   const formatDate = (date: string | Date) => {
-    const locale = language === 'fr' ? 'fr-FR' : 'en-US'
-    return new Date(date).toLocaleDateString(locale, { month: 'short', year: 'numeric' })
+    return new Date(date).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
   }
 
   const groupedSkills = skills.reduce((acc, skill) => {
@@ -130,7 +132,7 @@ export default function CVPreview({
         {profile && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '0.75rem' }}>
             <h3 style={{ fontSize: '0.75rem', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '4px', color: colors.accent }}>
-              {labels.contact}
+              Contact
             </h3>
             {profile.email && (
               <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -174,7 +176,7 @@ export default function CVPreview({
         {profile?.summary && (
           <div>
             <h2 style={{ fontSize: '0.875rem', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.05em', color: colors.primary, marginBottom: '8px' }}>
-              {labels.profile}
+              Profile
             </h2>
             <p style={{ fontSize: '0.75rem', color: colors.textMuted, lineHeight: '1.6' }}>
               {profile.summary}
@@ -312,7 +314,7 @@ export default function CVPreview({
           paddingBottom: '4px',
           marginBottom: '12px'
         }}>
-          {labels.experience}
+          Experience
         </h2>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
           {experiences.map((exp) => (
@@ -325,7 +327,7 @@ export default function CVPreview({
                   </p>
                 </div>
                 <span style={{ fontSize: '0.75rem', color: colors.textMuted, whiteSpace: 'nowrap', fontStyle: 'italic' }}>
-                  {formatDate(exp.startDate)} - {exp.current ? labels.present : formatDate(exp.endDate!)}
+                  {formatDate(exp.startDate)} - {exp.current ? 'Present' : formatDate(exp.endDate!)}
                 </span>
               </div>
               <p style={{
@@ -381,7 +383,7 @@ export default function CVPreview({
           paddingBottom: '4px',
           marginBottom: '12px'
         }}>
-          {labels.education}
+          Education
         </h2>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
           {formations.map((form) => (
@@ -394,7 +396,7 @@ export default function CVPreview({
                   </p>
                 </div>
                 <span style={{ fontSize: '0.75rem', color: colors.textMuted, whiteSpace: 'nowrap', fontStyle: 'italic' }}>
-                  {formatDate(form.startDate)} - {form.current ? labels.present : formatDate(form.endDate!)}
+                  {formatDate(form.startDate)} - {form.current ? 'Present' : formatDate(form.endDate!)}
                 </span>
               </div>
               {form.description && (
@@ -432,13 +434,13 @@ export default function CVPreview({
           paddingBottom: '4px',
           marginBottom: '12px'
         }}>
-          {labels.skills}
+          Skills
         </h2>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
           {Object.entries(groupedSkills).map(([category, categorySkills]) => (
             <div key={category}>
               <h3 style={{ fontSize: '0.75rem', fontWeight: '600', color: colors.textMuted, marginBottom: '6px' }}>
-                {getCategoryLabel(category, language)}
+                {categoryLabels[category] || category}
               </h3>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
                 {categorySkills.map((skill) => (
@@ -479,7 +481,7 @@ export default function CVPreview({
               marginBottom: '8px',
               color: colors.accent,
             }}>
-              {getCategoryLabel(category, language)}
+              {categoryLabels[category] || category}
             </h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
               {categorySkills.map((skill) => (

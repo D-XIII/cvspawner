@@ -1,16 +1,15 @@
 'use client'
 
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
-import { FileText, Download, Loader2, Eye, EyeOff, Palette, Languages, ChevronDown, Settings } from 'lucide-react'
-import Link from 'next/link'
+import { FileText, Download, Loader2, Eye, EyeOff, Palette } from 'lucide-react'
 import Card from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
 import CVSelector from '@/components/cv/CVSelector'
 import CVPreview from '@/components/cv/CVPreview'
 import TemplateSelector from '@/components/cv/TemplateSelector'
 import { generatePDF } from '@/lib/pdf-generator'
-import { Profile, Experience, Formation, Skill, TranslationLanguage, LLMSettings } from '@/types'
+import { Profile, Experience, Formation, Skill } from '@/types'
 
 export default function GeneratorPage() {
   const [profile, setProfile] = useState<Profile | null>(null)
@@ -19,21 +18,9 @@ export default function GeneratorPage() {
   const [skills, setSkills] = useState<Skill[]>([])
   const [loading, setLoading] = useState(true)
   const [generating, setGenerating] = useState(false)
-  const [translating, setTranslating] = useState(false)
   const [showPreview, setShowPreview] = useState(true)
   const [showTemplates, setShowTemplates] = useState(false)
   const [selectedTemplate, setSelectedTemplate] = useState('modern')
-  const [showDownloadMenu, setShowDownloadMenu] = useState(false)
-  const [llmSettings, setLLMSettings] = useState<LLMSettings | null>(null)
-  const [error, setError] = useState<string | null>(null)
-
-  // Translated data for PDF generation
-  const [translatedProfile, setTranslatedProfile] = useState<Profile | null>(null)
-  const [translatedExperiences, setTranslatedExperiences] = useState<Experience[]>([])
-  const [translatedFormations, setTranslatedFormations] = useState<Formation[]>([])
-  const [currentLanguage, setCurrentLanguage] = useState<TranslationLanguage | null>(null)
-
-  const downloadMenuRef = useRef<HTMLDivElement>(null)
 
   const [selectedExperiences, setSelectedExperiences] = useState<string[]>([])
   const [selectedFormations, setSelectedFormations] = useState<string[]>([])
@@ -43,33 +30,20 @@ export default function GeneratorPage() {
     fetchAllData()
   }, [])
 
-  // Close dropdown when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (downloadMenuRef.current && !downloadMenuRef.current.contains(event.target as Node)) {
-        setShowDownloadMenu(false)
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [])
-
   const fetchAllData = async () => {
     try {
-      const [profileRes, experiencesRes, formationsRes, skillsRes, settingsRes] = await Promise.all([
+      const [profileRes, experiencesRes, formationsRes, skillsRes] = await Promise.all([
         fetch('/api/profile'),
         fetch('/api/experiences'),
         fetch('/api/formations'),
         fetch('/api/skills'),
-        fetch('/api/settings'),
       ])
 
-      const [profileData, experiencesData, formationsData, skillsData, settingsData] = await Promise.all([
+      const [profileData, experiencesData, formationsData, skillsData] = await Promise.all([
         profileRes.json(),
         experiencesRes.json(),
         formationsRes.json(),
         skillsRes.json(),
-        settingsRes.json(),
       ])
 
       if (profileData.success) setProfile(profileData.data)
@@ -84,9 +58,6 @@ export default function GeneratorPage() {
       if (skillsData.success) {
         setSkills(skillsData.data)
         setSelectedSkills(skillsData.data.map((s: Skill) => s._id!))
-      }
-      if (settingsData.success) {
-        setLLMSettings(settingsData.data)
       }
     } catch (error) {
       console.error('Failed to fetch data:', error)
@@ -113,74 +84,14 @@ export default function GeneratorPage() {
     )
   }
 
-  const handleDownload = async (language?: TranslationLanguage) => {
-    setShowDownloadMenu(false)
-    setError(null)
-
-    if (language) {
-      // Translate first, then generate PDF
-      setTranslating(true)
-      try {
-        const response = await fetch('/api/translate', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            content: {
-              profile,
-              experiences: selectedExperienceData,
-              formations: selectedFormationData,
-              skills: selectedSkillData,
-            },
-            targetLanguage: language,
-          }),
-        })
-
-        const data = await response.json()
-
-        if (!data.success) {
-          setError(data.error || 'Translation failed')
-          setTranslating(false)
-          return
-        }
-
-        // Store translated data for PDF generation
-        setTranslatedProfile(data.data.profile)
-        setTranslatedExperiences(data.data.experiences)
-        setTranslatedFormations(data.data.formations)
-        setCurrentLanguage(language)
-
-        // Wait for state update and re-render
-        setTimeout(async () => {
-          setTranslating(false)
-          setGenerating(true)
-          try {
-            await generatePDF('cv-preview-translated')
-          } catch (error) {
-            console.error('Failed to generate PDF:', error)
-          } finally {
-            setGenerating(false)
-            // Clear translated data
-            setTranslatedProfile(null)
-            setTranslatedExperiences([])
-            setTranslatedFormations([])
-            setCurrentLanguage(null)
-          }
-        }, 100)
-      } catch (error) {
-        console.error('Translation failed:', error)
-        setError('Translation failed. Please try again.')
-        setTranslating(false)
-      }
-    } else {
-      // Generate PDF without translation
-      setGenerating(true)
-      try {
-        await generatePDF()
-      } catch (error) {
-        console.error('Failed to generate PDF:', error)
-      } finally {
-        setGenerating(false)
-      }
+  const handleDownload = async () => {
+    setGenerating(true)
+    try {
+      await generatePDF()
+    } catch (error) {
+      console.error('Failed to generate PDF:', error)
+    } finally {
+      setGenerating(false)
     }
   }
 
@@ -190,7 +101,6 @@ export default function GeneratorPage() {
 
   const hasData = profile || experiences.length > 0 || formations.length > 0 || skills.length > 0
   const hasSelection = selectedExperiences.length > 0 || selectedFormations.length > 0 || selectedSkills.length > 0
-  const isProcessing = generating || translating
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -227,109 +137,17 @@ export default function GeneratorPage() {
             {showPreview ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
             {showPreview ? 'Hide' : 'Show'} Preview
           </Button>
-
-          {/* Download Button with Dropdown */}
-          <div className="relative" ref={downloadMenuRef}>
-            {llmSettings?.isConfigured ? (
-              <>
-                <Button
-                  onClick={() => setShowDownloadMenu(!showDownloadMenu)}
-                  disabled={!hasSelection || isProcessing}
-                  loading={isProcessing}
-                  className="gap-2"
-                >
-                  {translating ? (
-                    <>
-                      <Languages className="w-4 h-4" />
-                      Translating...
-                    </>
-                  ) : (
-                    <>
-                      <Download className="w-4 h-4" />
-                      Download
-                      <ChevronDown className="w-4 h-4" />
-                    </>
-                  )}
-                </Button>
-
-                {showDownloadMenu && (
-                  <motion.div
-                    initial={{ opacity: 0, y: -10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="absolute right-0 mt-2 w-48 bg-card border border-border rounded-lg shadow-lg overflow-hidden z-50"
-                  >
-                    <button
-                      onClick={() => handleDownload()}
-                      className="w-full px-4 py-3 text-left text-sm text-foreground hover:bg-primary/10 flex items-center gap-2"
-                    >
-                      <Download className="w-4 h-4" />
-                      Original
-                    </button>
-                    <button
-                      onClick={() => handleDownload('fr')}
-                      className="w-full px-4 py-3 text-left text-sm text-foreground hover:bg-primary/10 flex items-center gap-2 border-t border-border"
-                    >
-                      <Languages className="w-4 h-4" />
-                      Français
-                    </button>
-                    <button
-                      onClick={() => handleDownload('en')}
-                      className="w-full px-4 py-3 text-left text-sm text-foreground hover:bg-primary/10 flex items-center gap-2 border-t border-border"
-                    >
-                      <Languages className="w-4 h-4" />
-                      English
-                    </button>
-                  </motion.div>
-                )}
-              </>
-            ) : (
-              <Button
-                onClick={() => handleDownload()}
-                disabled={!hasSelection || isProcessing}
-                loading={isProcessing}
-                className="gap-2"
-              >
-                <Download className="w-4 h-4" />
-                Download PDF
-              </Button>
-            )}
-          </div>
+          <Button
+            onClick={handleDownload}
+            disabled={!hasSelection || generating}
+            loading={generating}
+            className="gap-2"
+          >
+            <Download className="w-4 h-4" />
+            Download PDF
+          </Button>
         </div>
       </motion.div>
-
-      {/* Error Message */}
-      {error && (
-        <motion.div
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="mb-6 p-4 bg-red-500/10 border border-red-500/20 rounded-lg text-red-500 text-sm"
-        >
-          {error}
-        </motion.div>
-      )}
-
-      {/* LLM Setup Banner */}
-      {!loading && !llmSettings?.isConfigured && (
-        <motion.div
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="mb-6 p-4 bg-primary/10 border border-primary/20 rounded-lg flex items-center justify-between"
-        >
-          <div className="flex items-center gap-3">
-            <Languages className="w-5 h-5 text-primary" />
-            <div>
-              <p className="text-sm font-medium text-foreground">Enable CV Translation</p>
-              <p className="text-xs text-muted">Configure an LLM to download your CV in French or English</p>
-            </div>
-          </div>
-          <Link href="/settings">
-            <Button variant="secondary" size="sm" className="gap-2">
-              <Settings className="w-4 h-4" />
-              Setup
-            </Button>
-          </Link>
-        </motion.div>
-      )}
 
       {loading ? (
         <div className="flex items-center justify-center py-20">
@@ -410,7 +228,7 @@ export default function GeneratorPage() {
         </>
       )}
 
-      {/* Hidden full-size preview for PDF generation (original) */}
+      {/* Hidden full-size preview for PDF generation */}
       <div className="fixed -left-[9999px] -top-[9999px]">
         <CVPreview
           id="cv-preview-pdf"
@@ -421,21 +239,6 @@ export default function GeneratorPage() {
           templateId={selectedTemplate}
         />
       </div>
-
-      {/* Hidden full-size preview for PDF generation (translated) */}
-      {currentLanguage && (
-        <div className="fixed -left-[9999px] -top-[9999px]">
-          <CVPreview
-            id="cv-preview-translated"
-            profile={translatedProfile}
-            experiences={translatedExperiences}
-            formations={translatedFormations}
-            skills={selectedSkillData}
-            templateId={selectedTemplate}
-            language={currentLanguage}
-          />
-        </div>
-      )}
     </div>
   )
 }

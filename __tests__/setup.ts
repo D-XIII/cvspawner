@@ -3,7 +3,6 @@ import { cleanup } from '@testing-library/react'
 import * as matchers from '@testing-library/jest-dom/matchers'
 
 // Set environment variables for tests
-process.env.ENCRYPTION_SECRET = 'test-secret-key-for-encryption-32chars!'
 process.env.NEXTAUTH_SECRET = 'test-nextauth-secret-for-tests!'
 
 expect.extend(matchers)
