@@ -91,3 +91,41 @@ export type ApiResponse<T> = {
   success: false
   error: string
 }
+
+// Job Scraping types
+export interface ScrapedJob {
+  _id?: string
+  userId?: string
+  title: string
+  company: string
+  location?: string
+  jobUrl?: string
+  description?: string
+  salaryMin?: number
+  salaryMax?: number
+  salaryCurrency?: string
+  datePosted?: string
+  jobType?: string
+  isRemote: boolean
+  site: string
+  savedAt?: Date
+  createdAt?: Date
+  updatedAt?: Date
+}
+
+export interface ScrapeRequest {
+  searchTerm: string
+  location?: string
+  resultsWanted?: number
+  hoursOld?: number
+  countryIndeed?: string
+  siteNames?: string[]
+  remoteOnly?: boolean
+}
+
+export interface ScrapeResponse {
+  success: boolean
+  jobs: ScrapedJob[]
+  total: number
+  message?: string
+}

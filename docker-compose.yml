@@ -9,6 +9,7 @@ services:
       - MONGODB_URI=mongodb://mongodb-dev:27017/cvspawner-dev
       - NODE_ENV=development
       - WATCHPACK_POLLING=true
+      - SCRAPER_URL=http://scraper:8000
     volumes:
       - .:/app
       - /app/node_modules
@@ -16,6 +17,7 @@ services:
     command: sh -c "npm install && npm run dev"
     depends_on:
       - mongodb-dev
+      - scraper
     restart: unless-stopped
 
   mongodb-dev:
@@ -28,6 +30,22 @@ services:
     environment:
       - MONGO_INITDB_DATABASE=cvspawner-dev
     restart: unless-stopped
+
+  scraper:
+    build:
+      context: ./scraper
+      dockerfile: Dockerfile
+    container_name: cvspawner-scraper-dev
+    ports:
+      - "8000:8000"
+    environment:
+      - PYTHONUNBUFFERED=1
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
 volumes:
   mongodb_data_dev:

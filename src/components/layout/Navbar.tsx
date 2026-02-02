@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useSession, signOut } from 'next-auth/react'
 import { motion } from 'framer-motion'
-import { FileText, Briefcase, GraduationCap, Wrench, User, Sparkles, Send, LogOut } from 'lucide-react'
+import { FileText, Briefcase, GraduationCap, Wrench, User, Sparkles, Send, LogOut, Globe } from 'lucide-react'
 
 const navItems = [
   { href: '/', label: 'Home', icon: Sparkles },
@@ -12,6 +12,7 @@ const navItems = [
   { href: '/experiences', label: 'Experiences', icon: Briefcase },
   { href: '/formations', label: 'Formations', icon: GraduationCap },
   { href: '/skills', label: 'Skills', icon: Wrench },
+  { href: '/jobs', label: 'Jobs', icon: Globe },
   { href: '/applications', label: 'Applications', icon: Send },
   { href: '/generator', label: 'Generate CV', icon: FileText },
 ]
