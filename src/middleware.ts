@@ -2,9 +2,13 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { getToken } from 'next-auth/jwt'
 
+const publicPages = ['/', '/auth/signin', '/auth/signup']
+
 export async function middleware(request: NextRequest) {
   const token = await getToken({ req: request })
-  const isAuthPage = request.nextUrl.pathname.startsWith('/auth')
+  const pathname = request.nextUrl.pathname
+  const isPublicPage = publicPages.includes(pathname)
+  const isAuthPage = pathname.startsWith('/auth')
 
   if (isAuthPage) {
     if (token) {
@@ -13,9 +17,13 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next()
   }
 
+  if (isPublicPage) {
+    return NextResponse.next()
+  }
+
   if (!token) {
     const signInUrl = new URL('/auth/signin', request.url)
-    signInUrl.searchParams.set('callbackUrl', request.nextUrl.pathname)
+    signInUrl.searchParams.set('callbackUrl', pathname)
     return NextResponse.redirect(signInUrl)
   }
 

@@ -1,11 +1,14 @@
 'use client'
 
 import Link from 'next/link'
+import { useSession } from 'next-auth/react'
 import { motion } from 'framer-motion'
 import { FileText, Briefcase, GraduationCap, Wrench, ArrowRight, Sparkles } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import Card, { CardHeader, CardTitle, CardDescription } from '@/components/ui/Card'
 import ScrollReveal from '@/components/animations/ScrollReveal'
+import DemoCV from '@/components/home/DemoCV'
+import DemoStats from '@/components/home/DemoStats'
 
 const features = [
   {
@@ -39,6 +42,8 @@ const features = [
 ]
 
 export default function HomePage() {
+  const { data: session } = useSession()
+
   return (
     <div className="min-h-screen">
       {/* Hero Section */}
@@ -82,19 +87,65 @@ export default function HomePage() {
               transition={{ delay: 0.5 }}
               className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4"
             >
-              <Link href="/generator">
-                <Button size="lg" className="gap-2">
-                  Start Creating
-                  <ArrowRight className="w-5 h-5" />
-                </Button>
-              </Link>
-              <Link href="/profile">
-                <Button variant="secondary" size="lg">
-                  Setup Profile
-                </Button>
-              </Link>
+              {session ? (
+                <>
+                  <Link href="/generator">
+                    <Button size="lg" className="gap-2">
+                      Start Creating
+                      <ArrowRight className="w-5 h-5" />
+                    </Button>
+                  </Link>
+                  <Link href="/profile">
+                    <Button variant="secondary" size="lg">
+                      Setup Profile
+                    </Button>
+                  </Link>
+                </>
+              ) : (
+                <>
+                  <Link href="/auth/signup">
+                    <Button size="lg" className="gap-2">
+                      Get Started Free
+                      <ArrowRight className="w-5 h-5" />
+                    </Button>
+                  </Link>
+                  <Link href="/auth/signin">
+                    <Button variant="secondary" size="lg">
+                      Sign In
+                    </Button>
+                  </Link>
+                </>
+              )}
             </motion.div>
           </motion.div>
+        </div>
+      </section>
+
+      {/* Preview Section */}
+      <section className="py-24 overflow-hidden">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <ScrollReveal>
+            <div className="text-center mb-16">
+              <h2 className="text-3xl md:text-4xl font-bold text-foreground">
+                See It In Action
+              </h2>
+              <p className="mt-4 text-lg text-muted max-w-2xl mx-auto">
+                Generate professional CVs and track your job applications all in one place.
+              </p>
+            </div>
+          </ScrollReveal>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16 items-center">
+            {/* Demo CV */}
+            <div className="flex justify-center">
+              <DemoCV />
+            </div>
+
+            {/* Demo Stats */}
+            <div className="max-w-md mx-auto lg:mx-0">
+              <DemoStats />
+            </div>
+          </div>
         </div>
       </section>
 
@@ -196,12 +247,14 @@ export default function HomePage() {
               Ready to Build Your CV?
             </h2>
             <p className="text-lg text-muted mb-10 max-w-2xl mx-auto">
-              Start adding your experiences and create a stunning CV that stands out.
+              {session
+                ? 'Start adding your experiences and create a stunning CV that stands out.'
+                : 'Join now and create a stunning CV that stands out from the crowd.'}
             </p>
-            <Link href="/generator">
+            <Link href={session ? '/generator' : '/auth/signup'}>
               <Button size="lg" className="gap-2 animate-pulse-glow">
                 <FileText className="w-5 h-5" />
-                Create Your CV Now
+                {session ? 'Create Your CV Now' : 'Get Started Free'}
               </Button>
             </Link>
           </div>
