@@ -29,10 +29,10 @@ export function groupSkillsByCategory(skills: CVData['skills']) {
   }, {} as Record<string, CVData['skills']>)
 }
 
-export async function generatePDF(): Promise<void> {
-  const cvPreview = document.getElementById('cv-preview-pdf')
+export async function generatePDF(elementId: string = 'cv-preview-pdf'): Promise<void> {
+  const cvPreview = document.getElementById(elementId)
   if (!cvPreview) {
-    throw new Error('CV preview element not found')
+    throw new Error(`CV preview element not found: ${elementId}`)
   }
 
   // Dynamic import to avoid SSR issues

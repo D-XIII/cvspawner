@@ -4,6 +4,19 @@ import { motion } from 'framer-motion'
 import { Mail, Phone, MapPin, Linkedin, Github } from 'lucide-react'
 import { demoProfile, demoExperiences, demoFormations, demoSkills } from '@/data/demo-data'
 
+// Modern template colors for the demo
+const colors = {
+  primary: '#7c3aed',
+  headerBg: 'linear-gradient(135deg, #7c3aed 0%, #4f46e5 100%)',
+  headerText: '#ffffff',
+  background: '#ffffff',
+  text: '#1f2937',
+  textMuted: '#6b7280',
+  border: '#e5e7eb',
+  skillBg: '#ede9fe',
+  skillText: '#5b21b6',
+}
+
 export default function DemoCV() {
   const formatDate = (date: string | Date) => {
     return new Date(date).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
@@ -32,87 +45,116 @@ export default function DemoCV() {
       style={{ perspective: '1000px' }}
     >
       {/* Glow effect behind */}
-      <div className="absolute inset-0 bg-gradient-to-br from-primary/20 to-accent/20 blur-3xl rounded-3xl" />
+      <div className="absolute inset-0 bg-gradient-to-br from-purple-500/30 to-indigo-500/20 blur-3xl rounded-3xl" />
 
       {/* CV Container */}
       <motion.div
         whileHover={{ scale: 1.02, rotateY: 2 }}
         transition={{ duration: 0.3 }}
-        className="relative bg-white rounded-xl shadow-2xl overflow-hidden"
+        className="relative rounded-xl shadow-2xl overflow-hidden"
         style={{
           width: '100%',
           maxWidth: '400px',
           aspectRatio: '210 / 297',
+          backgroundColor: colors.background,
         }}
       >
         {/* Scaled CV Content */}
         <div
-          className="origin-top-left p-4 text-gray-900"
+          className="origin-top-left"
           style={{
             transform: 'scale(0.48)',
             width: '210%',
             height: '210%',
+            color: colors.text,
           }}
         >
-          {/* Header */}
-          <header className="border-b-2 border-gray-800 pb-3 mb-3">
-            <h1 className="text-2xl font-bold text-gray-900">
+          {/* Modern Header with gradient */}
+          <header
+            style={{
+              background: colors.headerBg,
+              color: colors.headerText,
+              padding: '24px',
+            }}
+          >
+            <h1 style={{ fontSize: '1.5rem', fontWeight: 'bold' }}>
               {demoProfile.firstName} {demoProfile.lastName}
             </h1>
-            <p className="text-lg text-gray-600">{demoProfile.title}</p>
+            <p style={{ fontSize: '1rem', marginTop: '4px', opacity: 0.9 }}>
+              {demoProfile.title}
+            </p>
 
-            <div className="flex flex-wrap gap-3 mt-2 text-xs text-gray-600">
-              <span className="flex items-center gap-1">
-                <Mail className="w-3 h-3" />
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', marginTop: '12px', fontSize: '0.7rem', opacity: 0.9 }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <Mail style={{ width: '10px', height: '10px' }} />
                 {demoProfile.email}
               </span>
-              <span className="flex items-center gap-1">
-                <Phone className="w-3 h-3" />
+              <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <Phone style={{ width: '10px', height: '10px' }} />
                 {demoProfile.phone}
               </span>
-              <span className="flex items-center gap-1">
-                <MapPin className="w-3 h-3" />
+              <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <MapPin style={{ width: '10px', height: '10px' }} />
                 {demoProfile.address}
               </span>
-              <span className="flex items-center gap-1">
-                <Linkedin className="w-3 h-3" />
+              <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <Linkedin style={{ width: '10px', height: '10px' }} />
                 LinkedIn
               </span>
-              <span className="flex items-center gap-1">
-                <Github className="w-3 h-3" />
+              <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <Github style={{ width: '10px', height: '10px' }} />
                 GitHub
               </span>
             </div>
 
-            <p className="mt-2 text-xs text-gray-700 leading-relaxed">
+            <p style={{ marginTop: '10px', fontSize: '0.7rem', opacity: 0.85, lineHeight: '1.5' }}>
               {demoProfile.summary}
             </p>
           </header>
 
-          <div className="grid grid-cols-3 gap-4">
+          {/* Content */}
+          <div style={{ padding: '16px 24px', display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '20px' }}>
             {/* Main content - 2/3 */}
-            <div className="col-span-2 space-y-3">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
               {/* Experiences */}
               <section>
-                <h2 className="text-sm font-bold text-gray-900 uppercase tracking-wide border-b border-gray-300 pb-1 mb-2">
+                <h2 style={{
+                  fontSize: '0.8rem',
+                  fontWeight: 'bold',
+                  color: colors.primary,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.05em',
+                  borderBottom: `2px solid ${colors.primary}`,
+                  paddingBottom: '4px',
+                  marginBottom: '10px'
+                }}>
                   Experience
                 </h2>
-                <div className="space-y-2">
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                   {demoExperiences.slice(0, 2).map((exp) => (
                     <div key={exp._id}>
-                      <div className="flex justify-between items-start">
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                         <div>
-                          <h3 className="font-semibold text-gray-900 text-sm">{exp.title}</h3>
-                          <p className="text-gray-600 text-xs">{exp.company} • {exp.location}</p>
+                          <h3 style={{ fontWeight: '600', color: colors.text, fontSize: '0.85rem' }}>{exp.title}</h3>
+                          <p style={{ color: colors.textMuted, fontSize: '0.7rem' }}>{exp.company} • {exp.location}</p>
                         </div>
-                        <span className="text-xs text-gray-500 whitespace-nowrap">
+                        <span style={{ fontSize: '0.65rem', color: colors.textMuted, whiteSpace: 'nowrap', fontStyle: 'italic' }}>
                           {formatDate(exp.startDate)} - {exp.current ? 'Present' : formatDate(exp.endDate!)}
                         </span>
                       </div>
-                      <p className="text-xs text-gray-700 mt-1 line-clamp-2">{exp.description}</p>
-                      <div className="flex flex-wrap gap-1 mt-1">
+                      <p style={{ fontSize: '0.65rem', color: colors.textMuted, marginTop: '4px', lineHeight: '1.4' }}>
+                        {exp.description?.slice(0, 120)}...
+                      </p>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '3px', marginTop: '4px' }}>
                         {exp.skills.slice(0, 4).map((skill) => (
-                          <span key={skill} className="text-xs px-1.5 py-0.5 bg-gray-100 text-gray-600 rounded">
+                          <span key={skill} style={{
+                            fontSize: '0.55rem',
+                            padding: '2px 6px',
+                            backgroundColor: colors.skillBg,
+                            color: colors.skillText,
+                            borderRadius: '3px',
+                            fontWeight: '500',
+                          }}>
                             {skill}
                           </span>
                         ))}
@@ -124,18 +166,27 @@ export default function DemoCV() {
 
               {/* Education */}
               <section>
-                <h2 className="text-sm font-bold text-gray-900 uppercase tracking-wide border-b border-gray-300 pb-1 mb-2">
+                <h2 style={{
+                  fontSize: '0.8rem',
+                  fontWeight: 'bold',
+                  color: colors.primary,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.05em',
+                  borderBottom: `2px solid ${colors.primary}`,
+                  paddingBottom: '4px',
+                  marginBottom: '10px'
+                }}>
                   Education
                 </h2>
-                <div className="space-y-2">
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                   {demoFormations.map((form) => (
                     <div key={form._id}>
-                      <div className="flex justify-between items-start">
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                         <div>
-                          <h3 className="font-semibold text-gray-900 text-sm">{form.degree}</h3>
-                          <p className="text-gray-600 text-xs">{form.school}</p>
+                          <h3 style={{ fontWeight: '600', color: colors.text, fontSize: '0.8rem' }}>{form.degree}</h3>
+                          <p style={{ color: colors.textMuted, fontSize: '0.7rem' }}>{form.school}</p>
                         </div>
-                        <span className="text-xs text-gray-500 whitespace-nowrap">
+                        <span style={{ fontSize: '0.65rem', color: colors.textMuted, whiteSpace: 'nowrap', fontStyle: 'italic' }}>
                           {formatDate(form.startDate)} - {formatDate(form.endDate!)}
                         </span>
                       </div>
@@ -146,22 +197,38 @@ export default function DemoCV() {
             </div>
 
             {/* Sidebar - 1/3 */}
-            <div className="space-y-3">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
               <section>
-                <h2 className="text-sm font-bold text-gray-900 uppercase tracking-wide border-b border-gray-300 pb-1 mb-2">
+                <h2 style={{
+                  fontSize: '0.8rem',
+                  fontWeight: 'bold',
+                  color: colors.primary,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.05em',
+                  borderBottom: `2px solid ${colors.primary}`,
+                  paddingBottom: '4px',
+                  marginBottom: '10px'
+                }}>
                   Skills
                 </h2>
-                <div className="space-y-2">
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                   {Object.entries(groupedSkills).slice(0, 3).map(([category, skills]) => (
                     <div key={category}>
-                      <h3 className="text-xs font-semibold text-gray-700 mb-1">
+                      <h3 style={{ fontSize: '0.65rem', fontWeight: '600', color: colors.textMuted, marginBottom: '4px' }}>
                         {categoryLabels[category]}
                       </h3>
-                      <div className="flex flex-wrap gap-1">
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '3px' }}>
                         {skills.slice(0, 4).map((skill) => (
                           <span
                             key={skill._id}
-                            className="text-xs px-1.5 py-0.5 bg-gray-100 text-gray-700 rounded"
+                            style={{
+                              fontSize: '0.55rem',
+                              padding: '2px 6px',
+                              backgroundColor: colors.skillBg,
+                              color: colors.skillText,
+                              borderRadius: '3px',
+                              fontWeight: '500',
+                            }}
                           >
                             {skill.name}
                           </span>
@@ -176,7 +243,7 @@ export default function DemoCV() {
         </div>
 
         {/* Overlay gradient */}
-        <div className="absolute inset-0 bg-gradient-to-t from-white/20 to-transparent pointer-events-none" />
+        <div className="absolute inset-0 bg-gradient-to-t from-white/10 to-transparent pointer-events-none" />
       </motion.div>
 
       {/* Label */}

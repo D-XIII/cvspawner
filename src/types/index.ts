@@ -91,3 +91,36 @@ export type ApiResponse<T> = {
   success: false
   error: string
 }
+
+// LLM Provider types
+export type LLMProvider = 'claude' | 'openai' | 'gemini'
+
+export interface LLMSettings {
+  _id?: string
+  userId?: string
+  provider: LLMProvider
+  apiKey?: string // Only sent to server, never returned
+  isConfigured: boolean
+  createdAt?: Date
+  updatedAt?: Date
+}
+
+export type TranslationLanguage = 'fr' | 'en'
+
+export interface TranslationRequest {
+  content: {
+    profile?: Profile
+    experiences: Experience[]
+    formations: Formation[]
+    skills: Skill[]
+  }
+  targetLanguage: TranslationLanguage
+}
+
+export interface TranslatedCV {
+  profile?: Profile
+  experiences: Experience[]
+  formations: Formation[]
+  skills: Skill[]
+  language: TranslationLanguage
+}
