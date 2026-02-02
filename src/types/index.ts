@@ -1,5 +1,6 @@
 export interface Profile {
   _id?: string
+  userId?: string
   firstName: string
   lastName: string
   email: string
@@ -16,6 +17,7 @@ export interface Profile {
 
 export interface Experience {
   _id?: string
+  userId?: string
   title: string
   company: string
   location?: string
@@ -30,6 +32,7 @@ export interface Experience {
 
 export interface Formation {
   _id?: string
+  userId?: string
   degree: string
   school: string
   location?: string
@@ -43,6 +46,7 @@ export interface Formation {
 
 export interface Skill {
   _id?: string
+  userId?: string
   name: string
   category: 'technical' | 'soft' | 'language' | 'tool'
   level: 1 | 2 | 3 | 4 | 5
@@ -54,6 +58,7 @@ export type ApplicationStatus = 'draft' | 'sent' | 'followed_up' | 'interview' |
 
 export interface Application {
   _id?: string
+  userId?: string
   company: string
   position: string
   location?: string

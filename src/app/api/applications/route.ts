@@ -1,13 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { connectToDatabase } from '@/lib/mongodb'
+import { requireAuth } from '@/lib/auth-utils'
 import Application from '@/models/Application'
 
 const validStatuses = ['draft', 'sent', 'followed_up', 'interview', 'rejected', 'accepted']
 
 export async function GET() {
   try {
+    const { user, error } = await requireAuth()
+    if (error) return error
+
     await connectToDatabase()
-    const applications = await Application.find().sort({ updatedAt: -1 })
+    const applications = await Application.find({ userId: user!.id }).sort({ updatedAt: -1 })
     return NextResponse.json({ success: true, data: applications })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to fetch applications'
@@ -17,6 +21,9 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
+    const { user, error } = await requireAuth()
+    if (error) return error
+
     await connectToDatabase()
     const body = await request.json()
 
@@ -34,6 +41,7 @@ export async function POST(request: NextRequest) {
     }
 
     const application = await Application.create({
+      userId: user!.id,
       company: body.company.trim(),
       position: body.position.trim(),
       location: body.location?.trim() || '',

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { connectToDatabase } from '@/lib/mongodb'
+import { requireAuth } from '@/lib/auth-utils'
 import Application from '@/models/Application'
 
 type RouteParams = { params: Promise<{ id: string }> }
@@ -7,9 +8,12 @@ const validStatuses = ['draft', 'sent', 'followed_up', 'interview', 'rejected', 
 
 export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
+    const { user, error } = await requireAuth()
+    if (error) return error
+
     await connectToDatabase()
     const { id } = await params
-    const application = await Application.findById(id)
+    const application = await Application.findOne({ _id: id, userId: user!.id })
 
     if (!application) {
       return NextResponse.json({ success: false, error: 'Application not found' }, { status: 404 })
@@ -24,6 +28,9 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
 export async function PUT(request: NextRequest, { params }: RouteParams) {
   try {
+    const { user, error } = await requireAuth()
+    if (error) return error
+
     await connectToDatabase()
     const { id } = await params
     const body = await request.json()
@@ -50,7 +57,11 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     if (body.appliedAt !== undefined) updateData.appliedAt = body.appliedAt ? new Date(body.appliedAt) : null
     if (body.notes !== undefined) updateData.notes = body.notes?.trim() || ''
 
-    const application = await Application.findByIdAndUpdate(id, updateData, { new: true })
+    const application = await Application.findOneAndUpdate(
+      { _id: id, userId: user!.id },
+      updateData,
+      { new: true }
+    )
 
     if (!application) {
       return NextResponse.json({ success: false, error: 'Application not found' }, { status: 404 })
@@ -65,9 +76,12 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
 
 export async function DELETE(request: NextRequest, { params }: RouteParams) {
   try {
+    const { user, error } = await requireAuth()
+    if (error) return error
+
     await connectToDatabase()
     const { id } = await params
-    const application = await Application.findByIdAndDelete(id)
+    const application = await Application.findOneAndDelete({ _id: id, userId: user!.id })
 
     if (!application) {
       return NextResponse.json({ success: false, error: 'Application not found' }, { status: 404 })

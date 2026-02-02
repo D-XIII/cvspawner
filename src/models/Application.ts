@@ -1,6 +1,7 @@
-import mongoose, { Schema, Document, Model } from 'mongoose'
+import mongoose, { Schema, Document, Model, Types } from 'mongoose'
 
 export interface IApplication extends Document {
+  userId: Types.ObjectId
   company: string
   position: string
   location?: string
@@ -14,6 +15,7 @@ export interface IApplication extends Document {
 
 const ApplicationSchema = new Schema<IApplication>(
   {
+    userId: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
     company: { type: String, required: true, trim: true },
     position: { type: String, required: true, trim: true },
     location: { type: String, trim: true },

@@ -2,8 +2,9 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { useSession, signOut } from 'next-auth/react'
 import { motion } from 'framer-motion'
-import { FileText, Briefcase, GraduationCap, Wrench, User, Sparkles, Send } from 'lucide-react'
+import { FileText, Briefcase, GraduationCap, Wrench, User, Sparkles, Send, LogOut } from 'lucide-react'
 
 const navItems = [
   { href: '/', label: 'Home', icon: Sparkles },
@@ -17,6 +18,7 @@ const navItems = [
 
 export default function Navbar() {
   const pathname = usePathname()
+  const { data: session } = useSession()
 
   return (
     <motion.nav
@@ -63,14 +65,35 @@ export default function Navbar() {
             })}
           </div>
 
+          {/* User menu */}
+          <div className="hidden md:flex items-center gap-3">
+            {session?.user && (
+              <>
+                <span className="text-sm text-muted">
+                  {session.user.name || session.user.email}
+                </span>
+                <button
+                  onClick={() => signOut({ callbackUrl: '/auth/signin' })}
+                  className="p-2 text-muted hover:text-foreground hover:bg-card rounded-lg transition-colors"
+                  title="Sign out"
+                >
+                  <LogOut className="w-4 h-4" />
+                </button>
+              </>
+            )}
+          </div>
+
           {/* Mobile menu button */}
-          <div className="md:hidden">
-            <Link
-              href="/generator"
-              className="px-4 py-2 bg-primary hover:bg-primary-hover rounded-lg text-white text-sm font-medium transition-colors"
-            >
-              Generate CV
-            </Link>
+          <div className="md:hidden flex items-center gap-2">
+            {session?.user && (
+              <button
+                onClick={() => signOut({ callbackUrl: '/auth/signin' })}
+                className="p-2 text-muted hover:text-foreground hover:bg-card rounded-lg transition-colors"
+                title="Sign out"
+              >
+                <LogOut className="w-4 h-4" />
+              </button>
+            )}
           </div>
         </div>
       </div>
