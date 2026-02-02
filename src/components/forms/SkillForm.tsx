@@ -18,13 +18,13 @@ const categoryOptions = [
   { value: 'tool', label: 'Tool' },
 ]
 
-const levelOptions = [
-  { value: '1', label: '1 - Beginner' },
-  { value: '2', label: '2 - Elementary' },
-  { value: '3', label: '3 - Intermediate' },
-  { value: '4', label: '4 - Advanced' },
-  { value: '5', label: '5 - Expert' },
-]
+const levelLabels: Record<number, string> = {
+  1: 'Beginner',
+  2: 'Elementary',
+  3: 'Intermediate',
+  4: 'Advanced',
+  5: 'Expert',
+}
 
 export default function SkillForm({ skill, onSubmit, onCancel }: SkillFormProps) {
   const [loading, setLoading] = useState(false)
@@ -54,33 +54,25 @@ export default function SkillForm({ skill, onSubmit, onCancel }: SkillFormProps)
         required
       />
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Select
-          label="Category"
-          value={formData.category}
-          onChange={(e) => setFormData({ ...formData, category: e.target.value as Skill['category'] })}
-          options={categoryOptions}
-          required
-        />
-
-        <Select
-          label="Level"
-          value={String(formData.level)}
-          onChange={(e) => setFormData({ ...formData, level: Number(e.target.value) as Skill['level'] })}
-          options={levelOptions}
-          required
-        />
-      </div>
+      <Select
+        label="Category"
+        value={formData.category}
+        onChange={(e) => setFormData({ ...formData, category: e.target.value as Skill['category'] })}
+        options={categoryOptions}
+        required
+      />
 
       <div className="space-y-2">
-        <label className="block text-sm font-medium text-foreground">Level Preview</label>
+        <label className="block text-sm font-medium text-foreground">
+          Level: {formData.level} - {levelLabels[formData.level]}
+        </label>
         <div className="flex gap-1">
           {[1, 2, 3, 4, 5].map((level) => (
             <button
               key={level}
               type="button"
               onClick={() => setFormData({ ...formData, level: level as Skill['level'] })}
-              aria-label={`Set level to ${level}`}
+              aria-label={`Set level to ${level} - ${levelLabels[level]}`}
               className={`h-3 w-full rounded-full transition-all cursor-pointer hover:scale-110 ${
                 level <= formData.level ? 'bg-primary hover:bg-primary/80' : 'bg-border hover:bg-primary/40'
               }`}
