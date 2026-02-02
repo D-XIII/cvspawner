@@ -1,0 +1,27 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: cvspawner-app-prod
+    ports:
+      - "3001:3000"
+    environment:
+      - MONGODB_URI=mongodb://mongodb-prod:27017/cvspawner
+    depends_on:
+      - mongodb-prod
+    restart: unless-stopped
+
+  mongodb-prod:
+    image: mongo:7
+    container_name: cvspawner-mongodb-prod
+    ports:
+      - "27019:27017"
+    volumes:
+      - mongodb_data_prod:/data/db
+    environment:
+      - MONGO_INITDB_DATABASE=cvspawner
+    restart: unless-stopped
+
+volumes:
+  mongodb_data_prod:
