@@ -69,6 +69,8 @@ export async function POST(request: NextRequest) {
       isRemote: Boolean(body.isRemote),
       site: body.site.trim(),
       savedAt: new Date(),
+      // Initialize score status as pending
+      scoreStatus: 'pending',
     }
 
     const job = await ScrapedJob.create(jobData)

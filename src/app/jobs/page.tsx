@@ -15,10 +15,13 @@ import {
   DollarSign,
   Trash2,
   Filter,
+  Sparkles,
+  RefreshCw,
 } from 'lucide-react'
 import Card, { CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
+import CompatibilityBadge from '@/components/jobs/CompatibilityBadge'
 import { ScrapedJob, ScrapeRequest } from '@/types'
 
 const siteColors: Record<string, string> = {
@@ -37,6 +40,8 @@ export default function JobsPage() {
   const [saving, setSaving] = useState<string | null>(null)
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const [activeTab, setActiveTab] = useState<'search' | 'saved'>('search')
+  const [calculatingScores, setCalculatingScores] = useState(false)
+  const [scoreStats, setScoreStats] = useState<{ pending: number; calculating: number; completed: number; error: number } | null>(null)
 
   // Search form state
   const [searchTerm, setSearchTerm] = useState('')
@@ -46,7 +51,55 @@ export default function JobsPage() {
 
   useEffect(() => {
     fetchSavedJobs()
+    fetchScoreStats()
   }, [])
+
+  // Poll for score updates when there are jobs being calculated
+  useEffect(() => {
+    if (scoreStats?.calculating && scoreStats.calculating > 0) {
+      const interval = setInterval(() => {
+        fetchSavedJobs()
+        fetchScoreStats()
+      }, 3000) // Poll every 3 seconds
+      return () => clearInterval(interval)
+    }
+  }, [scoreStats?.calculating])
+
+  const fetchScoreStats = async () => {
+    try {
+      const res = await fetch('/api/jobs/calculate-scores')
+      const data = await res.json()
+      if (data.success) {
+        setScoreStats(data.data)
+      }
+    } catch {
+      console.error('Failed to fetch score stats')
+    }
+  }
+
+  const handleCalculateScores = async () => {
+    setCalculatingScores(true)
+    setMessage(null)
+
+    try {
+      const res = await fetch('/api/jobs/calculate-scores', {
+        method: 'POST',
+      })
+      const data = await res.json()
+
+      if (data.success) {
+        setMessage({ type: 'success', text: data.message })
+        // Refresh jobs and stats
+        await Promise.all([fetchSavedJobs(), fetchScoreStats()])
+      } else {
+        setMessage({ type: 'error', text: data.error })
+      }
+    } catch {
+      setMessage({ type: 'error', text: 'Failed to calculate scores. Make sure the scoring service is running.' })
+    } finally {
+      setCalculatingScores(false)
+    }
+  }
 
   const fetchSavedJobs = async () => {
     try {
@@ -120,8 +173,10 @@ export default function JobsPage() {
 
       if (data.success) {
         setSavedJobs([data.data, ...savedJobs])
-        setMessage({ type: 'success', text: 'Job saved!' })
-        setTimeout(() => setMessage(null), 2000)
+        setMessage({ type: 'success', text: 'Job saved! Score will be calculated in background.' })
+        setTimeout(() => setMessage(null), 3000)
+        // Refresh score stats
+        fetchScoreStats()
       } else {
         setMessage({ type: 'error', text: data.error })
       }
@@ -181,6 +236,13 @@ export default function JobsPage() {
                 <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-green-500/20 text-green-400">
                   Remote
                 </span>
+              )}
+              {job._id && (
+                <CompatibilityBadge
+                  score={job.compatibilityScore}
+                  status={job.scoreStatus}
+                  error={job.scoreError}
+                />
               )}
             </div>
             <CardDescription className="flex items-center gap-2 mt-1">
@@ -430,6 +492,57 @@ export default function JobsPage() {
 
       {activeTab === 'saved' && (
         <>
+          {/* Score calculation controls */}
+          {savedJobs.length > 0 && (
+            <Card className="mb-6">
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                <div>
+                  <h3 className="text-sm font-medium text-foreground flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-primary" />
+                    CV Compatibility Scores
+                  </h3>
+                  <p className="text-xs text-muted mt-1">
+                    Calculate how well your CV matches each saved job.
+                  </p>
+                  {scoreStats && (
+                    <div className="flex gap-3 mt-2 text-xs text-muted">
+                      {scoreStats.pending > 0 && (
+                        <span>{scoreStats.pending} pending</span>
+                      )}
+                      {scoreStats.calculating > 0 && (
+                        <span className="text-blue-400">{scoreStats.calculating} calculating...</span>
+                      )}
+                      {scoreStats.completed > 0 && (
+                        <span className="text-green-400">{scoreStats.completed} completed</span>
+                      )}
+                      {scoreStats.error > 0 && (
+                        <span className="text-red-400">{scoreStats.error} errors</span>
+                      )}
+                    </div>
+                  )}
+                </div>
+                <Button
+                  onClick={handleCalculateScores}
+                  disabled={calculatingScores || (scoreStats?.pending === 0 && scoreStats?.error === 0)}
+                  loading={calculatingScores}
+                  className="gap-2"
+                >
+                  {calculatingScores ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Calculating...
+                    </>
+                  ) : (
+                    <>
+                      <RefreshCw className="w-4 h-4" />
+                      Calculate Scores
+                    </>
+                  )}
+                </Button>
+              </div>
+            </Card>
+          )}
+
           {loading ? (
             <div className="flex items-center justify-center py-20">
               <Loader2 className="w-8 h-8 animate-spin text-primary" />

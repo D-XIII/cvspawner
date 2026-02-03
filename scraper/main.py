@@ -5,6 +5,14 @@ from typing import Optional, List
 from jobspy import scrape_jobs
 import pandas as pd
 
+from scoring import (
+    prepare_cv_text,
+    prepare_job_text,
+    calculate_score,
+    calculate_batch_scores,
+    get_model_status,
+)
+
 app = FastAPI(title="JobSpy Scraper API", version="1.0.0")
 
 # CORS for Next.js
@@ -49,6 +57,61 @@ class ScrapeResponse(BaseModel):
     success: bool
     jobs: List[Job]
     total: int
+    message: Optional[str] = None
+
+
+# Scoring models
+class CVProfile(BaseModel):
+    title: Optional[str] = None
+    summary: Optional[str] = None
+
+
+class CVExperience(BaseModel):
+    title: Optional[str] = None
+    company: Optional[str] = None
+    description: Optional[str] = None
+
+
+class CVSkill(BaseModel):
+    name: str
+    category: Optional[str] = None
+
+
+class CVData(BaseModel):
+    profile: Optional[CVProfile] = None
+    experiences: List[CVExperience] = []
+    skills: List[CVSkill] = []
+
+
+class JobForScoring(BaseModel):
+    id: Optional[str] = None
+    title: str
+    company: str
+    description: Optional[str] = None
+
+
+class ScoreRequest(BaseModel):
+    cv_data: CVData
+    job: JobForScoring
+
+
+class ScoreResponse(BaseModel):
+    score: float
+    message: Optional[str] = None
+
+
+class BatchScoreRequest(BaseModel):
+    cv_data: CVData
+    jobs: List[JobForScoring]
+
+
+class BatchScoreResult(BaseModel):
+    id: str
+    score: float
+
+
+class BatchScoreResponse(BaseModel):
+    results: List[BatchScoreResult]
     message: Optional[str] = None
 
 
@@ -118,6 +181,104 @@ async def scrape_jobs_endpoint(request: ScrapeRequest):
         raise HTTPException(
             status_code=500,
             detail=f"Scraping failed: {str(e)}"
+        )
+
+
+@app.get("/model-status")
+async def model_status():
+    """Check if the ML model is loaded."""
+    status = get_model_status()
+    return status
+
+
+@app.post("/score", response_model=ScoreResponse)
+async def score_job(request: ScoreRequest):
+    """
+    Calculate compatibility score between a CV and a job.
+
+    Returns a score from 0 to 100 indicating how well the CV matches the job.
+    """
+    try:
+        # Convert Pydantic models to dicts for scoring functions
+        cv_dict = {
+            "profile": request.cv_data.profile.model_dump() if request.cv_data.profile else None,
+            "experiences": [e.model_dump() for e in request.cv_data.experiences],
+            "skills": [s.model_dump() for s in request.cv_data.skills]
+        }
+
+        cv_text = prepare_cv_text(cv_dict)
+
+        if not cv_text:
+            return ScoreResponse(
+                score=0,
+                message="CV is empty. Please add profile, experiences, or skills."
+            )
+
+        job_dict = request.job.model_dump()
+        job_text = prepare_job_text(job_dict)
+
+        score = calculate_score(cv_text, job_text)
+
+        return ScoreResponse(score=score)
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Score calculation failed: {str(e)}"
+        )
+
+
+@app.post("/score-batch", response_model=BatchScoreResponse)
+async def score_jobs_batch(request: BatchScoreRequest):
+    """
+    Calculate compatibility scores for multiple jobs at once.
+
+    More efficient than calling /score multiple times.
+    """
+    try:
+        # Convert CV data
+        cv_dict = {
+            "profile": request.cv_data.profile.model_dump() if request.cv_data.profile else None,
+            "experiences": [e.model_dump() for e in request.cv_data.experiences],
+            "skills": [s.model_dump() for s in request.cv_data.skills]
+        }
+
+        cv_text = prepare_cv_text(cv_dict)
+
+        if not cv_text:
+            # Return 0 for all jobs if CV is empty
+            results = [
+                BatchScoreResult(id=job.id or str(i), score=0)
+                for i, job in enumerate(request.jobs)
+            ]
+            return BatchScoreResponse(
+                results=results,
+                message="CV is empty. All scores set to 0."
+            )
+
+        # Prepare jobs for batch scoring
+        jobs_for_scoring = []
+        for i, job in enumerate(request.jobs):
+            job_text = prepare_job_text(job.model_dump())
+            jobs_for_scoring.append({
+                "id": job.id or str(i),
+                "text": job_text
+            })
+
+        # Calculate batch scores
+        score_results = calculate_batch_scores(cv_text, jobs_for_scoring)
+
+        results = [
+            BatchScoreResult(id=r["id"], score=r["score"])
+            for r in score_results
+        ]
+
+        return BatchScoreResponse(results=results)
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Batch scoring failed: {str(e)}"
         )
 
 

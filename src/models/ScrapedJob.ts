@@ -1,5 +1,7 @@
 import mongoose, { Schema, Document, Model, Types } from 'mongoose'
 
+export type ScoreStatus = 'pending' | 'calculating' | 'completed' | 'error'
+
 export interface IScrapedJob extends Document {
   userId: Types.ObjectId
   title: string
@@ -15,6 +17,11 @@ export interface IScrapedJob extends Document {
   isRemote: boolean
   site: string
   savedAt: Date
+  // Compatibility score fields
+  compatibilityScore?: number
+  scoreStatus: ScoreStatus
+  scoreCalculatedAt?: Date
+  scoreError?: string
   createdAt: Date
   updatedAt: Date
 }
@@ -35,6 +42,15 @@ const ScrapedJobSchema = new Schema<IScrapedJob>(
     isRemote: { type: Boolean, default: false },
     site: { type: String, required: true, trim: true },
     savedAt: { type: Date, default: Date.now },
+    // Compatibility score fields
+    compatibilityScore: { type: Number, min: 0, max: 100 },
+    scoreStatus: {
+      type: String,
+      enum: ['pending', 'calculating', 'completed', 'error'],
+      default: 'pending'
+    },
+    scoreCalculatedAt: { type: Date },
+    scoreError: { type: String },
   },
   { timestamps: true }
 )
@@ -42,6 +58,8 @@ const ScrapedJobSchema = new Schema<IScrapedJob>(
 // Compound index for efficient queries
 ScrapedJobSchema.index({ userId: 1, company: 1, title: 1 })
 ScrapedJobSchema.index({ userId: 1, savedAt: -1 })
+// Index for finding jobs needing score calculation
+ScrapedJobSchema.index({ userId: 1, scoreStatus: 1 })
 
 const ScrapedJob: Model<IScrapedJob> =
   mongoose.models.ScrapedJob || mongoose.model<IScrapedJob>('ScrapedJob', ScrapedJobSchema)
