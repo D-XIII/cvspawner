@@ -61,9 +61,45 @@ export default function JobsPage() {
 
   // Search form state
   const [searchTerm, setSearchTerm] = useState('')
-  const [location, setLocation] = useState('Switzerland')
+  const [location, setLocation] = useState('')
   const [resultsWanted, setResultsWanted] = useState(20)
   const [remoteOnly, setRemoteOnly] = useState(false)
+
+  // Auto-detect user location on mount
+  useEffect(() => {
+    if (!navigator.geolocation) {
+      setLocation('Switzerland') // Fallback
+      return
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        try {
+          const { latitude, longitude } = position.coords
+          const response = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json&addressdetails=1`,
+            { headers: { 'Accept-Language': 'en' } }
+          )
+          if (response.ok) {
+            const data = await response.json()
+            const city = data.address?.city || data.address?.town || data.address?.village || data.address?.municipality
+            const country = data.address?.country
+            if (city && country) {
+              setLocation(`${city}, ${country}`)
+            } else if (country) {
+              setLocation(country)
+            }
+          }
+        } catch {
+          setLocation('Switzerland') // Fallback on error
+        }
+      },
+      () => {
+        setLocation('Switzerland') // Fallback if denied
+      },
+      { timeout: 5000 }
+    )
+  }, [])
 
   useEffect(() => {
     fetchSavedJobs()
