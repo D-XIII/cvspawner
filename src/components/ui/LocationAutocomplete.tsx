@@ -92,14 +92,13 @@ export default function LocationAutocomplete({
     setIsLoading(true)
 
     try {
-      // Use Nominatim API for geocoding
+      // Use Nominatim API for geocoding (no featuretype filter to include all places)
       const response = await fetch(
         `https://nominatim.openstreetmap.org/search?` +
         `q=${encodeURIComponent(query)}&` +
         `format=json&` +
         `addressdetails=1&` +
-        `limit=10&` +
-        `featuretype=city,town,village,country,state`,
+        `limit=15`,
         {
           headers: {
             'Accept-Language': 'en',
