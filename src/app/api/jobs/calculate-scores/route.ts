@@ -84,10 +84,13 @@ export async function POST() {
       }, { status: 400 })
     }
 
-    // Get jobs with pending status
+    // Get jobs with pending status or no status (legacy jobs)
     const pendingJobs = await ScrapedJob.find({
       userId: user!.id,
-      scoreStatus: 'pending',
+      $or: [
+        { scoreStatus: 'pending' },
+        { scoreStatus: { $exists: false } },
+      ],
     }).lean()
 
     if (pendingJobs.length === 0) {
@@ -178,7 +181,7 @@ export async function GET() {
       { $match: { userId: new mongoose.Types.ObjectId(user!.id) } },
       {
         $group: {
-          _id: '$scoreStatus',
+          _id: { $ifNull: ['$scoreStatus', 'pending'] },
           count: { $sum: 1 },
         },
       },
