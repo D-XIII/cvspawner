@@ -144,7 +144,7 @@ export async function POST() {
     // Update each job with its score
     const bulkOps = data.results.map((result: { id: string; score: number }) => ({
       updateOne: {
-        filter: { _id: result.id },
+        filter: { _id: new mongoose.Types.ObjectId(result.id) },
         update: {
           $set: {
             compatibilityScore: result.score,
