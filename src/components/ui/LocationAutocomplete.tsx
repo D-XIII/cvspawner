@@ -1,139 +1,45 @@
 'use client'
 
-import { useState, useRef, useEffect, ReactNode } from 'react'
-import { MapPin } from 'lucide-react'
+import { useState, useRef, useEffect, ReactNode, useCallback } from 'react'
+import { MapPin, Loader2, Globe } from 'lucide-react'
 
-// Location data with cities and countries
-const LOCATIONS = [
-  // Switzerland - Cities
-  { value: 'Zurich, Switzerland', label: 'Zurich', country: 'Switzerland', type: 'city' },
-  { value: 'Geneva, Switzerland', label: 'Geneva', country: 'Switzerland', type: 'city' },
-  { value: 'Basel, Switzerland', label: 'Basel', country: 'Switzerland', type: 'city' },
-  { value: 'Bern, Switzerland', label: 'Bern', country: 'Switzerland', type: 'city' },
-  { value: 'Lausanne, Switzerland', label: 'Lausanne', country: 'Switzerland', type: 'city' },
-  { value: 'Lucerne, Switzerland', label: 'Lucerne', country: 'Switzerland', type: 'city' },
-  { value: 'St. Gallen, Switzerland', label: 'St. Gallen', country: 'Switzerland', type: 'city' },
-  { value: 'Lugano, Switzerland', label: 'Lugano', country: 'Switzerland', type: 'city' },
-  { value: 'Winterthur, Switzerland', label: 'Winterthur', country: 'Switzerland', type: 'city' },
-  { value: 'Zug, Switzerland', label: 'Zug', country: 'Switzerland', type: 'city' },
-  // Switzerland - Country
-  { value: 'Switzerland', label: 'Switzerland', country: 'Switzerland', type: 'country' },
+interface NominatimResult {
+  place_id: number
+  display_name: string
+  type: string
+  class: string
+  address?: {
+    city?: string
+    town?: string
+    village?: string
+    municipality?: string
+    county?: string
+    state?: string
+    country?: string
+    country_code?: string
+  }
+}
 
-  // Germany
-  { value: 'Berlin, Germany', label: 'Berlin', country: 'Germany', type: 'city' },
-  { value: 'Munich, Germany', label: 'Munich', country: 'Germany', type: 'city' },
-  { value: 'Frankfurt, Germany', label: 'Frankfurt', country: 'Germany', type: 'city' },
-  { value: 'Hamburg, Germany', label: 'Hamburg', country: 'Germany', type: 'city' },
-  { value: 'Cologne, Germany', label: 'Cologne', country: 'Germany', type: 'city' },
-  { value: 'Stuttgart, Germany', label: 'Stuttgart', country: 'Germany', type: 'city' },
-  { value: 'Düsseldorf, Germany', label: 'Düsseldorf', country: 'Germany', type: 'city' },
-  { value: 'Germany', label: 'Germany', country: 'Germany', type: 'country' },
+interface LocationSuggestion {
+  value: string
+  label: string
+  sublabel: string
+  type: 'city' | 'country' | 'region'
+}
 
-  // France
-  { value: 'Paris, France', label: 'Paris', country: 'France', type: 'city' },
-  { value: 'Lyon, France', label: 'Lyon', country: 'France', type: 'city' },
-  { value: 'Marseille, France', label: 'Marseille', country: 'France', type: 'city' },
-  { value: 'Toulouse, France', label: 'Toulouse', country: 'France', type: 'city' },
-  { value: 'Nice, France', label: 'Nice', country: 'France', type: 'city' },
-  { value: 'Bordeaux, France', label: 'Bordeaux', country: 'France', type: 'city' },
-  { value: 'France', label: 'France', country: 'France', type: 'country' },
-
-  // UK
-  { value: 'London, UK', label: 'London', country: 'United Kingdom', type: 'city' },
-  { value: 'Manchester, UK', label: 'Manchester', country: 'United Kingdom', type: 'city' },
-  { value: 'Birmingham, UK', label: 'Birmingham', country: 'United Kingdom', type: 'city' },
-  { value: 'Edinburgh, UK', label: 'Edinburgh', country: 'United Kingdom', type: 'city' },
-  { value: 'Bristol, UK', label: 'Bristol', country: 'United Kingdom', type: 'city' },
-  { value: 'Cambridge, UK', label: 'Cambridge', country: 'United Kingdom', type: 'city' },
-  { value: 'United Kingdom', label: 'United Kingdom', country: 'United Kingdom', type: 'country' },
-
-  // Netherlands
-  { value: 'Amsterdam, Netherlands', label: 'Amsterdam', country: 'Netherlands', type: 'city' },
-  { value: 'Rotterdam, Netherlands', label: 'Rotterdam', country: 'Netherlands', type: 'city' },
-  { value: 'The Hague, Netherlands', label: 'The Hague', country: 'Netherlands', type: 'city' },
-  { value: 'Utrecht, Netherlands', label: 'Utrecht', country: 'Netherlands', type: 'city' },
-  { value: 'Eindhoven, Netherlands', label: 'Eindhoven', country: 'Netherlands', type: 'city' },
-  { value: 'Netherlands', label: 'Netherlands', country: 'Netherlands', type: 'country' },
-
-  // Belgium
-  { value: 'Brussels, Belgium', label: 'Brussels', country: 'Belgium', type: 'city' },
-  { value: 'Antwerp, Belgium', label: 'Antwerp', country: 'Belgium', type: 'city' },
-  { value: 'Ghent, Belgium', label: 'Ghent', country: 'Belgium', type: 'city' },
-  { value: 'Belgium', label: 'Belgium', country: 'Belgium', type: 'country' },
-
-  // Austria
-  { value: 'Vienna, Austria', label: 'Vienna', country: 'Austria', type: 'city' },
-  { value: 'Salzburg, Austria', label: 'Salzburg', country: 'Austria', type: 'city' },
-  { value: 'Innsbruck, Austria', label: 'Innsbruck', country: 'Austria', type: 'city' },
-  { value: 'Austria', label: 'Austria', country: 'Austria', type: 'country' },
-
-  // Italy
-  { value: 'Milan, Italy', label: 'Milan', country: 'Italy', type: 'city' },
-  { value: 'Rome, Italy', label: 'Rome', country: 'Italy', type: 'city' },
-  { value: 'Turin, Italy', label: 'Turin', country: 'Italy', type: 'city' },
-  { value: 'Florence, Italy', label: 'Florence', country: 'Italy', type: 'city' },
-  { value: 'Bologna, Italy', label: 'Bologna', country: 'Italy', type: 'city' },
-  { value: 'Italy', label: 'Italy', country: 'Italy', type: 'country' },
-
-  // Spain
-  { value: 'Madrid, Spain', label: 'Madrid', country: 'Spain', type: 'city' },
-  { value: 'Barcelona, Spain', label: 'Barcelona', country: 'Spain', type: 'city' },
-  { value: 'Valencia, Spain', label: 'Valencia', country: 'Spain', type: 'city' },
-  { value: 'Seville, Spain', label: 'Seville', country: 'Spain', type: 'city' },
-  { value: 'Spain', label: 'Spain', country: 'Spain', type: 'country' },
-
-  // Portugal
-  { value: 'Lisbon, Portugal', label: 'Lisbon', country: 'Portugal', type: 'city' },
-  { value: 'Porto, Portugal', label: 'Porto', country: 'Portugal', type: 'city' },
-  { value: 'Portugal', label: 'Portugal', country: 'Portugal', type: 'country' },
-
-  // Ireland
-  { value: 'Dublin, Ireland', label: 'Dublin', country: 'Ireland', type: 'city' },
-  { value: 'Cork, Ireland', label: 'Cork', country: 'Ireland', type: 'city' },
-  { value: 'Ireland', label: 'Ireland', country: 'Ireland', type: 'country' },
-
-  // Nordic
-  { value: 'Stockholm, Sweden', label: 'Stockholm', country: 'Sweden', type: 'city' },
-  { value: 'Sweden', label: 'Sweden', country: 'Sweden', type: 'country' },
-  { value: 'Copenhagen, Denmark', label: 'Copenhagen', country: 'Denmark', type: 'city' },
-  { value: 'Denmark', label: 'Denmark', country: 'Denmark', type: 'country' },
-  { value: 'Oslo, Norway', label: 'Oslo', country: 'Norway', type: 'city' },
-  { value: 'Norway', label: 'Norway', country: 'Norway', type: 'country' },
-  { value: 'Helsinki, Finland', label: 'Helsinki', country: 'Finland', type: 'city' },
-  { value: 'Finland', label: 'Finland', country: 'Finland', type: 'country' },
-
-  // Other European
-  { value: 'Prague, Czech Republic', label: 'Prague', country: 'Czech Republic', type: 'city' },
-  { value: 'Czech Republic', label: 'Czech Republic', country: 'Czech Republic', type: 'country' },
-  { value: 'Warsaw, Poland', label: 'Warsaw', country: 'Poland', type: 'city' },
-  { value: 'Krakow, Poland', label: 'Krakow', country: 'Poland', type: 'city' },
-  { value: 'Poland', label: 'Poland', country: 'Poland', type: 'country' },
-  { value: 'Luxembourg', label: 'Luxembourg', country: 'Luxembourg', type: 'country' },
-
-  // North America
-  { value: 'New York, USA', label: 'New York', country: 'USA', type: 'city' },
-  { value: 'San Francisco, USA', label: 'San Francisco', country: 'USA', type: 'city' },
-  { value: 'Los Angeles, USA', label: 'Los Angeles', country: 'USA', type: 'city' },
-  { value: 'Seattle, USA', label: 'Seattle', country: 'USA', type: 'city' },
-  { value: 'Austin, USA', label: 'Austin', country: 'USA', type: 'city' },
-  { value: 'Boston, USA', label: 'Boston', country: 'USA', type: 'city' },
-  { value: 'Chicago, USA', label: 'Chicago', country: 'USA', type: 'city' },
-  { value: 'USA', label: 'USA', country: 'USA', type: 'country' },
-  { value: 'Toronto, Canada', label: 'Toronto', country: 'Canada', type: 'city' },
-  { value: 'Vancouver, Canada', label: 'Vancouver', country: 'Canada', type: 'city' },
-  { value: 'Montreal, Canada', label: 'Montreal', country: 'Canada', type: 'city' },
-  { value: 'Canada', label: 'Canada', country: 'Canada', type: 'country' },
-
-  // Asia Pacific
-  { value: 'Singapore', label: 'Singapore', country: 'Singapore', type: 'country' },
-  { value: 'Tokyo, Japan', label: 'Tokyo', country: 'Japan', type: 'city' },
-  { value: 'Japan', label: 'Japan', country: 'Japan', type: 'country' },
-  { value: 'Sydney, Australia', label: 'Sydney', country: 'Australia', type: 'city' },
-  { value: 'Melbourne, Australia', label: 'Melbourne', country: 'Australia', type: 'city' },
-  { value: 'Australia', label: 'Australia', country: 'Australia', type: 'country' },
-
-  // Remote
-  { value: 'Remote', label: 'Remote / Worldwide', country: '', type: 'remote' },
+// Popular locations shown by default
+const POPULAR_LOCATIONS: LocationSuggestion[] = [
+  { value: 'Switzerland', label: 'Switzerland', sublabel: 'Country', type: 'country' },
+  { value: 'Zurich, Switzerland', label: 'Zurich', sublabel: 'Switzerland', type: 'city' },
+  { value: 'Geneva, Switzerland', label: 'Geneva', sublabel: 'Switzerland', type: 'city' },
+  { value: 'Basel, Switzerland', label: 'Basel', sublabel: 'Switzerland', type: 'city' },
+  { value: 'Bern, Switzerland', label: 'Bern', sublabel: 'Switzerland', type: 'city' },
+  { value: 'Lausanne, Switzerland', label: 'Lausanne', sublabel: 'Switzerland', type: 'city' },
+  { value: 'France', label: 'France', sublabel: 'Country', type: 'country' },
+  { value: 'Paris, France', label: 'Paris', sublabel: 'France', type: 'city' },
+  { value: 'Germany', label: 'Germany', sublabel: 'Country', type: 'country' },
+  { value: 'Berlin, Germany', label: 'Berlin', sublabel: 'Germany', type: 'city' },
+  { value: 'Remote', label: 'Remote', sublabel: 'Work from anywhere', type: 'region' },
 ]
 
 interface LocationAutocompleteProps {
@@ -148,14 +54,16 @@ export default function LocationAutocomplete({
   value,
   onChange,
   label,
-  placeholder = 'e.g., Switzerland, Geneva, Zurich',
+  placeholder = 'Search any city or country...',
   icon,
 }: LocationAutocompleteProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [inputValue, setInputValue] = useState(value)
-  const [filteredLocations, setFilteredLocations] = useState(LOCATIONS)
+  const [suggestions, setSuggestions] = useState<LocationSuggestion[]>(POPULAR_LOCATIONS)
+  const [isLoading, setIsLoading] = useState(false)
   const wrapperRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+  const debounceRef = useRef<NodeJS.Timeout | null>(null)
 
   // Sync input value with prop
   useEffect(() => {
@@ -173,27 +81,119 @@ export default function LocationAutocomplete({
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
-  // Filter locations based on input
-  useEffect(() => {
-    if (!inputValue.trim()) {
-      // Show popular locations when empty
-      setFilteredLocations(LOCATIONS.filter(l =>
-        l.country === 'Switzerland' || l.type === 'country' || l.type === 'remote'
-      ).slice(0, 15))
+  // Fetch suggestions from Nominatim API
+  const fetchSuggestions = useCallback(async (query: string) => {
+    if (query.length < 2) {
+      setSuggestions(POPULAR_LOCATIONS)
+      setIsLoading(false)
       return
     }
 
-    const search = inputValue.toLowerCase()
-    const filtered = LOCATIONS.filter(location => {
-      return (
-        location.label.toLowerCase().includes(search) ||
-        location.country.toLowerCase().includes(search) ||
-        location.value.toLowerCase().includes(search)
-      )
-    }).slice(0, 10)
+    setIsLoading(true)
 
-    setFilteredLocations(filtered)
-  }, [inputValue])
+    try {
+      // Use Nominatim API for geocoding
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/search?` +
+        `q=${encodeURIComponent(query)}&` +
+        `format=json&` +
+        `addressdetails=1&` +
+        `limit=10&` +
+        `featuretype=city,town,village,country,state`,
+        {
+          headers: {
+            'Accept-Language': 'en',
+          },
+        }
+      )
+
+      if (!response.ok) throw new Error('API error')
+
+      const results: NominatimResult[] = await response.json()
+
+      const newSuggestions: LocationSuggestion[] = results
+        .map((result) => {
+          const address = result.address || {}
+          const cityName = address.city || address.town || address.village || address.municipality
+          const country = address.country || ''
+          const state = address.state || address.county || ''
+
+          // Determine type and labels
+          if (result.class === 'boundary' && result.type === 'administrative' && !cityName) {
+            // Country or region
+            if (country && !state) {
+              return {
+                value: country,
+                label: country,
+                sublabel: 'Country',
+                type: 'country' as const,
+              }
+            } else if (state && country) {
+              return {
+                value: `${state}, ${country}`,
+                label: state,
+                sublabel: country,
+                type: 'region' as const,
+              }
+            }
+          }
+
+          // City/town
+          if (cityName) {
+            return {
+              value: `${cityName}, ${country}`,
+              label: cityName,
+              sublabel: state ? `${state}, ${country}` : country,
+              type: 'city' as const,
+            }
+          }
+
+          // Fallback: use display name
+          const parts = result.display_name.split(', ')
+          return {
+            value: parts.slice(0, 2).join(', '),
+            label: parts[0],
+            sublabel: parts.slice(1, 3).join(', '),
+            type: 'city' as const,
+          }
+        })
+        .filter((s, i, arr) =>
+          // Remove duplicates
+          arr.findIndex(x => x.value === s.value) === i
+        )
+
+      setSuggestions(newSuggestions.length > 0 ? newSuggestions : POPULAR_LOCATIONS)
+    } catch (error) {
+      console.error('Location search error:', error)
+      // Fallback to filtering popular locations
+      const filtered = POPULAR_LOCATIONS.filter(l =>
+        l.label.toLowerCase().includes(query.toLowerCase()) ||
+        l.sublabel.toLowerCase().includes(query.toLowerCase())
+      )
+      setSuggestions(filtered.length > 0 ? filtered : POPULAR_LOCATIONS)
+    } finally {
+      setIsLoading(false)
+    }
+  }, [])
+
+  // Debounced search
+  useEffect(() => {
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current)
+    }
+
+    if (!isOpen) return
+
+    debounceRef.current = setTimeout(() => {
+      fetchSuggestions(inputValue)
+    }, 300)
+
+    return () => {
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current)
+      }
+    }
+  }, [inputValue, isOpen, fetchSuggestions])
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = e.target.value
@@ -202,7 +202,7 @@ export default function LocationAutocomplete({
     setIsOpen(true)
   }
 
-  const handleSelect = (location: typeof LOCATIONS[0]) => {
+  const handleSelect = (location: LocationSuggestion) => {
     setInputValue(location.value)
     onChange(location.value)
     setIsOpen(false)
@@ -210,11 +210,25 @@ export default function LocationAutocomplete({
 
   const handleFocus = () => {
     setIsOpen(true)
+    if (!inputValue) {
+      setSuggestions(POPULAR_LOCATIONS)
+    }
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Escape') {
       setIsOpen(false)
+    }
+  }
+
+  const getIcon = (type: string) => {
+    switch (type) {
+      case 'country':
+        return <Globe className="w-4 h-4 text-blue-400" />
+      case 'region':
+        return <MapPin className="w-4 h-4 text-orange-400" />
+      default:
+        return <MapPin className="w-4 h-4 text-muted" />
     }
   }
 
@@ -244,39 +258,37 @@ export default function LocationAutocomplete({
             text-foreground placeholder-muted
             focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary
             transition-all duration-200
-            ${icon ? 'pl-10 pr-4' : 'px-4'}
+            ${icon ? 'pl-10 pr-10' : 'px-4 pr-10'}
           `}
         />
+        {isLoading && (
+          <div className="absolute right-3 top-1/2 -translate-y-1/2">
+            <Loader2 className="w-4 h-4 text-muted animate-spin" />
+          </div>
+        )}
       </div>
 
       {/* Dropdown */}
-      {isOpen && filteredLocations.length > 0 && (
+      {isOpen && suggestions.length > 0 && (
         <div className="absolute z-50 w-full mt-1 bg-card border border-border rounded-lg shadow-xl max-h-64 overflow-y-auto">
-          {filteredLocations.map((location, index) => (
+          {!inputValue && (
+            <div className="px-3 py-2 text-xs text-muted border-b border-border">
+              Popular locations
+            </div>
+          )}
+          {suggestions.map((location, index) => (
             <button
               key={location.value + index}
               type="button"
               onClick={() => handleSelect(location)}
               className="w-full px-4 py-2.5 text-left hover:bg-primary/10 transition-colors flex items-center gap-3 border-b border-border/50 last:border-0"
             >
-              <MapPin className={`w-4 h-4 flex-shrink-0 ${
-                location.type === 'country' ? 'text-blue-400' :
-                location.type === 'remote' ? 'text-green-400' :
-                'text-muted'
-              }`} />
+              {getIcon(location.type)}
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-foreground truncate">
                   {location.label}
                 </p>
-                {location.type === 'city' && (
-                  <p className="text-xs text-muted">{location.country}</p>
-                )}
-                {location.type === 'country' && (
-                  <p className="text-xs text-blue-400">Country</p>
-                )}
-                {location.type === 'remote' && (
-                  <p className="text-xs text-green-400">Work from anywhere</p>
-                )}
+                <p className="text-xs text-muted truncate">{location.sublabel}</p>
               </div>
             </button>
           ))}
