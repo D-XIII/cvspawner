@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: cvspawner-scraper
+  namespace: cvspawner
+  labels:
+    app.kubernetes.io/name: cvspawner
+    app.kubernetes.io/component: scraper
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 8000
+      targetPort: http
+      protocol: TCP
+  selector:
+    app.kubernetes.io/name: cvspawner
+    app.kubernetes.io/component: scraper

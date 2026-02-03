@@ -1,0 +1,29 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: cvspawner-ingress
+  namespace: cvspawner
+  labels:
+    app.kubernetes.io/name: cvspawner
+  annotations:
+    # Décommentez selon votre Ingress Controller
+    # nginx.ingress.kubernetes.io/rewrite-target: /
+    # cert-manager.io/cluster-issuer: "letsencrypt-prod"
+spec:
+  ingressClassName: nginx  # Adaptez selon votre cluster (traefik, nginx, etc.)
+  rules:
+    - host: cvspawner.example.com  # Remplacez par votre domaine
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: cvspawner-app
+                port:
+                  name: http
+  # Décommentez pour TLS avec cert-manager
+  # tls:
+  #   - hosts:
+  #       - cvspawner.example.com
+  #     secretName: cvspawner-tls

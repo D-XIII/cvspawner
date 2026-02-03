@@ -1,0 +1,89 @@
+apiVersion: psmdb.percona.com/v1
+kind: PerconaServerMongoDB
+metadata:
+  name: cvspawner-mongodb
+  namespace: cvspawner
+spec:
+  crVersion: "1.16.0"
+  image: percona/percona-server-mongodb:7.0.8-5
+  imagePullPolicy: IfNotPresent
+
+  # Configuration single-node (1 replica)
+  # Note: Pas de haute disponibilité avec 1 seul replica
+  replsets:
+    - name: rs0
+      size: 1  # Single node - pas de HA
+
+      # Affinité désactivée pour single-node cluster
+      affinity:
+        antiAffinityTopologyKey: "none"
+
+      volumeSpec:
+        persistentVolumeClaim:
+          storageClassName: ""  # Utilisera la StorageClass par défaut
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 10Gi
+
+      resources:
+        requests:
+          memory: "512Mi"
+          cpu: "300m"
+        limits:
+          memory: "1Gi"
+          cpu: "1000m"
+
+      configuration: |
+        operationProfiling:
+          mode: slowOp
+          slowOpThresholdMs: 100
+        security:
+          enableEncryption: false
+        setParameter:
+          ttlMonitorSleepSecs: 60
+
+  # Secrets pour l'authentification
+  secrets:
+    users: cvspawner-mongodb-secrets
+
+  # Désactiver les composants non nécessaires pour single-node
+  sharding:
+    enabled: false
+
+  mongos:
+    size: 0
+
+  # Backup (optionnel - à configurer si besoin)
+  backup:
+    enabled: false
+    # Pour activer les backups, configurez:
+    # enabled: true
+    # storages:
+    #   s3-backup:
+    #     type: s3
+    #     s3:
+    #       bucket: your-backup-bucket
+    #       region: eu-west-1
+    #       credentialsSecret: s3-backup-credentials
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: cvspawner-mongodb-secrets
+  namespace: cvspawner
+type: Opaque
+stringData:
+  # ⚠️ IMPORTANT: Changez ces valeurs en production!
+  # Générez avec: openssl rand -base64 16
+  MONGODB_BACKUP_USER: backup
+  MONGODB_BACKUP_PASSWORD: CHANGE_ME_backup_password
+  MONGODB_CLUSTER_ADMIN_USER: clusterAdmin
+  MONGODB_CLUSTER_ADMIN_PASSWORD: CHANGE_ME_cluster_admin_password
+  MONGODB_CLUSTER_MONITOR_USER: clusterMonitor
+  MONGODB_CLUSTER_MONITOR_PASSWORD: CHANGE_ME_monitor_password
+  MONGODB_USER_ADMIN_USER: userAdmin
+  MONGODB_USER_ADMIN_PASSWORD: CHANGE_ME_user_admin_password
+  MONGODB_DATABASE_ADMIN_USER: databaseAdmin
+  MONGODB_DATABASE_ADMIN_PASSWORD: CHANGE_ME_database_admin_password

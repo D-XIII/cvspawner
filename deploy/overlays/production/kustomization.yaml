@@ -1,0 +1,26 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: cvspawner
+
+resources:
+  - ../../base
+
+patches:
+  - path: patches/replicas.yaml
+  - path: patches/resources.yaml
+
+# Remplacez OWNER par votre username/org GitHub
+# Remplacez TAG par le tag réel après le premier build
+images:
+  - name: ghcr.io/OWNER/cvspawner
+    newName: ghcr.io/OWNER/cvspawner
+    newTag: sha-abc1234  # Sera mis à jour automatiquement ou manuellement
+  - name: ghcr.io/OWNER/cvspawner-scraper
+    newName: ghcr.io/OWNER/cvspawner-scraper
+    newTag: sha-abc1234  # Sera mis à jour automatiquement ou manuellement
+
+# Pour gérer les secrets de manière sécurisée, utilisez:
+# - Sealed Secrets: https://sealed-secrets.netlify.app/
+# - External Secrets Operator: https://external-secrets.io/
+# - Vault: https://www.vaultproject.io/

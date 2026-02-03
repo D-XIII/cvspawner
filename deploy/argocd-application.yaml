@@ -1,0 +1,68 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: cvspawner
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+
+  source:
+    # Remplacez par l'URL de votre repo de déploiement
+    repoURL: https://github.com/OWNER/cvspawner-deploy.git
+    targetRevision: HEAD
+    path: overlays/production
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: cvspawner
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: false
+    syncOptions:
+      - CreateNamespace=true
+      - PrunePropagationPolicy=foreground
+      - PruneLast=true
+
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+
+  # Health checks personnalisés
+  ignoreDifferences:
+    - group: apps
+      kind: Deployment
+      jsonPointers:
+        - /spec/replicas  # Ignore si HPA modifie les replicas
+---
+# Application séparée pour MongoDB (optionnel)
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: cvspawner-mongodb
+  namespace: argocd
+spec:
+  project: default
+
+  source:
+    repoURL: https://github.com/OWNER/cvspawner-deploy.git
+    targetRevision: HEAD
+    path: mongodb
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: cvspawner
+
+  syncPolicy:
+    automated:
+      prune: false  # Ne pas supprimer MongoDB automatiquement!
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

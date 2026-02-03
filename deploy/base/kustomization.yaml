@@ -1,0 +1,26 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: cvspawner
+
+resources:
+  - namespace.yaml
+  - configmap.yaml
+  - secret.yaml
+  - deployment-app.yaml
+  - deployment-scraper.yaml
+  - service-app.yaml
+  - service-scraper.yaml
+  - ingress.yaml
+
+labels:
+  - pairs:
+      app.kubernetes.io/part-of: cvspawner
+      app.kubernetes.io/managed-by: kustomize
+    includeSelectors: false
+
+images:
+  - name: ghcr.io/OWNER/cvspawner
+    newTag: main
+  - name: ghcr.io/OWNER/cvspawner-scraper
+    newTag: main

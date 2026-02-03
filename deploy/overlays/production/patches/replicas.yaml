@@ -1,0 +1,15 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cvspawner-app
+  namespace: cvspawner
+spec:
+  replicas: 2
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cvspawner-scraper
+  namespace: cvspawner
+spec:
+  replicas: 1
