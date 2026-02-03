@@ -147,6 +147,82 @@ export default function JobsPage() {
     }
   }
 
+  // Stream scores via SSE for scraped jobs
+  const streamScores = async (jobs: ScrapedJob[]) => {
+    try {
+      const jobsForScoring = jobs.map((job, index) => ({
+        index,
+        title: job.title,
+        company: job.company,
+        description: job.description,
+      }))
+
+      const response = await fetch('/api/jobs/score-stream', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jobs: jobsForScoring }),
+      })
+
+      // Check if response is SSE or JSON error
+      const contentType = response.headers.get('content-type')
+      if (contentType?.includes('application/json')) {
+        const data = await response.json()
+        if (data.error === 'cv_empty') {
+          // CV is empty, no scores to calculate
+          return
+        }
+        if (data.error) {
+          console.error('Score stream error:', data.error)
+          return
+        }
+      }
+
+      // Parse SSE stream
+      const reader = response.body?.getReader()
+      if (!reader) return
+
+      const decoder = new TextDecoder()
+      let buffer = ''
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split('\n')
+        buffer = lines.pop() || ''
+
+        let eventType = ''
+        for (const line of lines) {
+          if (line.startsWith('event: ')) {
+            eventType = line.slice(7)
+          } else if (line.startsWith('data: ')) {
+            const data = JSON.parse(line.slice(6))
+
+            if (eventType === 'score') {
+              // Update the specific job's score
+              setScrapedJobs((prev) =>
+                prev.map((job, idx) =>
+                  idx === data.index
+                    ? {
+                        ...job,
+                        compatibilityScore: data.score,
+                        scoreStatus: data.status,
+                        scoreError: data.error,
+                      }
+                    : job
+                )
+              )
+            }
+          }
+        }
+      }
+    } catch (err) {
+      console.error('Score streaming error:', err)
+      // Scores failed but jobs are still visible - graceful degradation
+    }
+  }
+
   const handleScrape = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!searchTerm.trim()) {
@@ -175,17 +251,28 @@ export default function JobsPage() {
       const data = await res.json()
 
       if (data.success) {
+        // Show jobs immediately with pending scores
         setScrapedJobs(data.jobs)
         setMessage({
           type: 'success',
           text: `Found ${data.total} jobs${data.message ? ` - ${data.message}` : ''}`,
         })
+        setScraping(false)
+
+        // Start streaming scores in background
+        if (data.jobs.length > 0) {
+          // Mark all jobs as calculating
+          setScrapedJobs((prev) =>
+            prev.map((job) => ({ ...job, scoreStatus: 'calculating' as const }))
+          )
+          streamScores(data.jobs)
+        }
       } else {
         setMessage({ type: 'error', text: data.error || 'Scraping failed' })
+        setScraping(false)
       }
     } catch {
       setMessage({ type: 'error', text: 'Failed to scrape jobs. Make sure the scraper service is running.' })
-    } finally {
       setScraping(false)
     }
   }
@@ -319,12 +406,12 @@ export default function JobsPage() {
     const hasApplied = !!application
 
     return (
-    <Card hover>
+    <Card hover className="max-w-full overflow-hidden">
       <CardHeader>
-        <div className="flex justify-between items-start">
-          <div className="flex-1 min-w-0">
+        <div className="flex justify-between items-start gap-2">
+          <div className="flex-1 min-w-0 overflow-hidden">
             <div className="flex items-center gap-2 flex-wrap">
-              <CardTitle className="truncate">{job.title}</CardTitle>
+              <CardTitle className="truncate max-w-[300px] sm:max-w-none">{job.title}</CardTitle>
               <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${siteColors[job.site] || 'bg-gray-500/20 text-gray-400'}`}>
                 {job.site}
               </span>
@@ -339,13 +426,11 @@ export default function JobsPage() {
                   Applied
                 </span>
               )}
-              {(job._id || job.compatibilityScore !== undefined) && (
-                <CompatibilityBadge
-                  score={job.compatibilityScore}
-                  status={job.scoreStatus}
-                  error={job.scoreError}
-                />
-              )}
+              <CompatibilityBadge
+                score={job.compatibilityScore}
+                status={job.scoreStatus}
+                error={job.scoreError}
+              />
             </div>
             <CardDescription className="flex items-center gap-2 mt-1">
               <Building className="w-3 h-3" />
