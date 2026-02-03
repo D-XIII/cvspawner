@@ -3,16 +3,43 @@ import { connectToDatabase } from '@/lib/mongodb'
 import { requireAuth } from '@/lib/auth-utils'
 import ScrapedJob from '@/models/ScrapedJob'
 
-// GET /api/jobs - Get all saved jobs for the user
-export async function GET() {
+const CLEANUP_DAYS = 7
+
+// Cleanup old scraped jobs (called automatically on GET)
+async function cleanupOldJobs() {
+  const cutoffDate = new Date()
+  cutoffDate.setDate(cutoffDate.getDate() - CLEANUP_DAYS)
+
+  await ScrapedJob.deleteMany({
+    status: 'scraped',
+    scrapedAt: { $lt: cutoffDate },
+  })
+}
+
+// GET /api/jobs - Get all jobs for the user with optional status filter
+// Query params: status (all | scraped | saved | applied)
+export async function GET(request: NextRequest) {
   try {
     const { user, error } = await requireAuth()
     if (error) return error
 
     await connectToDatabase()
 
-    const jobs = await ScrapedJob.find({ userId: user!.id })
-      .sort({ savedAt: -1 })
+    // Cleanup old scraped jobs automatically
+    await cleanupOldJobs()
+
+    const { searchParams } = new URL(request.url)
+    const status = searchParams.get('status')
+
+    // Build query
+    const query: Record<string, unknown> = { userId: user!.id }
+
+    if (status && status !== 'all') {
+      query.status = status
+    }
+
+    const jobs = await ScrapedJob.find(query)
+      .sort({ scrapedAt: -1 })
       .lean()
 
     return NextResponse.json({ success: true, data: jobs })

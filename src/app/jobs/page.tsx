@@ -5,39 +5,21 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   Search,
   Loader2,
-  ExternalLink,
-  Bookmark,
-  BookmarkCheck,
   MapPin,
-  Building,
-  Briefcase,
   Globe,
-  DollarSign,
-  Trash2,
   Sparkles,
-  RefreshCw,
-  Send,
   CheckCircle,
   Star,
-  Clock,
 } from 'lucide-react'
-import Card, { CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/Card'
+import Card from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import LocationAutocomplete from '@/components/ui/LocationAutocomplete'
 import Modal from '@/components/ui/Modal'
-import CompatibilityBadge from '@/components/jobs/CompatibilityBadge'
 import ScoreDetailsModal from '@/components/jobs/ScoreDetailsModal'
+import JobCard from '@/components/jobs/JobCard'
 import ApplicationForm from '@/components/forms/ApplicationForm'
 import { ScrapedJob, ScrapeRequest, Application, ScoreDetails, JobStatus } from '@/types'
-
-const siteColors: Record<string, string> = {
-  indeed: 'bg-blue-500/20 text-blue-400',
-  linkedin: 'bg-sky-500/20 text-sky-400',
-  glassdoor: 'bg-green-500/20 text-green-400',
-  zip_recruiter: 'bg-orange-500/20 text-orange-400',
-  google: 'bg-red-500/20 text-red-400',
-}
 
 type JobFilter = 'all' | 'saved' | 'applied'
 
@@ -464,169 +446,6 @@ export default function JobsPage() {
     }
   }
 
-  const isJobFavorite = (job: ScrapedJob) => {
-    return job.status === 'saved' || job.status === 'applied'
-  }
-
-  const formatSalary = (job: ScrapedJob) => {
-    if (!job.salaryMin && !job.salaryMax) return null
-    const currency = job.salaryCurrency || 'CHF'
-    if (job.salaryMin && job.salaryMax) {
-      return `${currency} ${job.salaryMin.toLocaleString()} - ${job.salaryMax.toLocaleString()}`
-    }
-    if (job.salaryMin) return `${currency} ${job.salaryMin.toLocaleString()}+`
-    return `Up to ${currency} ${job.salaryMax?.toLocaleString()}`
-  }
-
-  const JobCard = ({ job, showFavoriteButton = false, showDeleteButton = false, showApplyButton = false }: { job: ScrapedJob; showFavoriteButton?: boolean; showDeleteButton?: boolean; showApplyButton?: boolean }) => {
-    const application = job._id ? applicationsByJob[job._id] : undefined
-    const hasApplied = job.status === 'applied' || !!application
-    const isFavorite = isJobFavorite(job)
-    const isUpdating = updatingStatus === job._id
-
-    return (
-    <Card hover className="max-w-full overflow-hidden">
-      <CardHeader>
-        <div className="flex justify-between items-start gap-2">
-          <div className="flex-1 min-w-0 overflow-hidden">
-            <div className="flex items-center gap-2 flex-wrap">
-              <CardTitle className="truncate max-w-[300px] sm:max-w-none">{job.title}</CardTitle>
-              <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${siteColors[job.site] || 'bg-gray-500/20 text-gray-400'}`}>
-                {job.site}
-              </span>
-              {job.isRemote && (
-                <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-green-500/20 text-green-400">
-                  Remote
-                </span>
-              )}
-              {job.status === 'saved' && (
-                <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-500/20 text-yellow-400 flex items-center gap-1">
-                  <Star className="w-3 h-3" />
-                  Favori
-                </span>
-              )}
-              {hasApplied && (
-                <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-500/20 text-indigo-400 flex items-center gap-1">
-                  <CheckCircle className="w-3 h-3" />
-                  Postulé
-                </span>
-              )}
-              {job.status === 'scraped' && (
-                <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-gray-500/20 text-gray-400 flex items-center gap-1">
-                  <Clock className="w-3 h-3" />
-                  Récent
-                </span>
-              )}
-              <CompatibilityBadge
-                score={job.compatibilityScore}
-                status={job.scoreStatus}
-                error={job.scoreError}
-                hasDetails={!!job.scoreDetails}
-                onDetailsClick={() => handleViewScoreDetails(job)}
-              />
-            </div>
-            <CardDescription className="flex items-center gap-2 mt-1">
-              <Building className="w-3 h-3" />
-              {job.company}
-              {job.location && (
-                <>
-                  <span className="text-border">•</span>
-                  <MapPin className="w-3 h-3" />
-                  {job.location}
-                </>
-              )}
-            </CardDescription>
-          </div>
-        </div>
-      </CardHeader>
-
-      {/* Salary and type */}
-      <div className="flex flex-wrap gap-3 text-sm text-muted mb-3">
-        {formatSalary(job) && (
-          <span className="flex items-center gap-1">
-            <DollarSign className="w-3 h-3" />
-            {formatSalary(job)}
-          </span>
-        )}
-        {job.jobType && (
-          <span className="flex items-center gap-1">
-            <Briefcase className="w-3 h-3" />
-            {job.jobType}
-          </span>
-        )}
-        {job.datePosted && (
-          <span className="text-xs">Posted: {job.datePosted}</span>
-        )}
-      </div>
-
-      {/* Description preview */}
-      {job.description && (
-        <p className="text-sm text-muted line-clamp-2 mb-3">{job.description}</p>
-      )}
-
-      <CardFooter>
-        {job.jobUrl && (
-          <a
-            href={job.jobUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-1 text-sm text-primary hover:underline"
-          >
-            <ExternalLink className="w-3 h-3" />
-            View Job
-          </a>
-        )}
-        <div className="flex-1" />
-        {showFavoriteButton && (
-          <Button
-            variant={isFavorite ? 'secondary' : 'ghost'}
-            size="sm"
-            onClick={() => handleUpdateJobStatus(job, isFavorite ? 'scraped' : 'saved')}
-            disabled={isUpdating}
-            className="gap-1"
-          >
-            {isUpdating ? (
-              <Loader2 className="w-3 h-3 animate-spin" />
-            ) : isFavorite ? (
-              <>
-                <Star className="w-3 h-3 fill-yellow-400 text-yellow-400" />
-                Favori
-              </>
-            ) : (
-              <>
-                <Star className="w-3 h-3" />
-                Ajouter aux favoris
-              </>
-            )}
-          </Button>
-        )}
-        {showDeleteButton && (
-          <Button
-            variant="danger"
-            size="sm"
-            onClick={() => handleDeleteJob(job._id!)}
-            className="gap-1"
-          >
-            <Trash2 className="w-3 h-3" />
-            Supprimer
-          </Button>
-        )}
-        {showApplyButton && (
-          <Button
-            variant={hasApplied ? 'secondary' : 'primary'}
-            size="sm"
-            onClick={() => handleApplyToJob(job)}
-            className="gap-1"
-          >
-            <Send className="w-3 h-3" />
-            {hasApplied ? 'Voir candidature' : 'Postuler'}
-          </Button>
-        )}
-      </CardFooter>
-    </Card>
-  )
-  }
-
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
       <motion.div
@@ -814,17 +633,32 @@ export default function JobsPage() {
                 if (jobFilter === 'applied') return job.status === 'applied'
                 return true
               })
-              .map((job) => (
-                <motion.div
-                  key={job._id}
-                  layout
-                  initial={false}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, x: -20 }}
-                >
-                  <JobCard job={job} showFavoriteButton showDeleteButton showApplyButton />
-                </motion.div>
-              ))}
+              .map((job) => {
+                const application = job._id ? applicationsByJob[job._id] : undefined
+                const hasApplied = job.status === 'applied' || !!application
+                return (
+                  <motion.div
+                    key={job._id}
+                    layout
+                    initial={false}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, x: -20 }}
+                  >
+                    <JobCard
+                      job={job}
+                      showFavoriteButton
+                      showDeleteButton
+                      showApplyButton
+                      hasApplied={hasApplied}
+                      isUpdating={updatingStatus === job._id}
+                      onUpdateStatus={handleUpdateJobStatus}
+                      onDelete={handleDeleteJob}
+                      onApply={handleApplyToJob}
+                      onViewScoreDetails={handleViewScoreDetails}
+                    />
+                  </motion.div>
+                )
+              })}
           </AnimatePresence>
           {jobs.filter((job) => {
             if (jobFilter === 'all') return true

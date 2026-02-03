@@ -4,6 +4,7 @@ import { getAuthenticatedUser } from '@/lib/auth-utils'
 import Profile from '@/models/Profile'
 import Experience from '@/models/Experience'
 import Skill from '@/models/Skill'
+import ScrapedJob from '@/models/ScrapedJob'
 
 const SCRAPER_URL = process.env.SCRAPER_URL || 'http://localhost:8000'
 
@@ -15,6 +16,7 @@ interface CVDataForScoring {
 
 interface JobForScoring {
   index: number
+  id?: string // Database ID for updating scores
   title: string
   company: string
   description?: string
@@ -111,6 +113,16 @@ export async function POST(request: NextRequest) {
 
               if (scoreResponse.ok) {
                 const scoreData = await scoreResponse.json()
+
+                // Update score in database if job has an ID
+                if (job.id) {
+                  await ScrapedJob.findByIdAndUpdate(job.id, {
+                    compatibilityScore: scoreData.globalScore,
+                    scoreStatus: 'completed',
+                    scoreCalculatedAt: new Date(),
+                  })
+                }
+
                 sendEvent('score', {
                   index: job.index,
                   score: scoreData.globalScore,
@@ -125,6 +137,14 @@ export async function POST(request: NextRequest) {
                   },
                 })
               } else {
+                // Update error status in database
+                if (job.id) {
+                  await ScrapedJob.findByIdAndUpdate(job.id, {
+                    scoreStatus: 'error',
+                    scoreError: 'Scoring service error',
+                  })
+                }
+
                 sendEvent('score', {
                   index: job.index,
                   score: undefined,
@@ -133,12 +153,22 @@ export async function POST(request: NextRequest) {
                 })
               }
             } catch (err) {
+              const errorMsg = err instanceof Error ? err.message : 'Unknown error'
+
+              // Update error status in database
+              if (job.id) {
+                await ScrapedJob.findByIdAndUpdate(job.id, {
+                  scoreStatus: 'error',
+                  scoreError: errorMsg,
+                })
+              }
+
               // Send error for this specific job
               sendEvent('score', {
                 index: job.index,
                 score: undefined,
                 status: 'error',
-                error: err instanceof Error ? err.message : 'Unknown error',
+                error: errorMsg,
               })
             }
           }

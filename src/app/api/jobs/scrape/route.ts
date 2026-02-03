@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/auth-utils'
+import { connectToDatabase } from '@/lib/mongodb'
+import ScrapedJob from '@/models/ScrapedJob'
 
 const SCRAPER_URL = process.env.SCRAPER_URL || 'http://localhost:8000'
 
@@ -26,10 +28,11 @@ interface ScraperResponse {
 }
 
 // POST /api/jobs/scrape - Proxy to Python scraper service
-// Returns jobs immediately without scoring (scores streamed via SSE)
+// Saves all jobs to database and returns them with IDs
+// Scores are streamed separately via SSE
 export async function POST(request: NextRequest) {
   try {
-    const { error } = await requireAuth()
+    const { user, error } = await requireAuth()
     if (error) return error
 
     const body = await request.json()
@@ -80,9 +83,13 @@ export async function POST(request: NextRequest) {
 
     const scraperData: ScraperResponse = await response.json()
 
-    // Transform response to match our frontend format
-    // Scores will be streamed separately via SSE
-    const jobs = scraperData.jobs.map((job) => ({
+    // Connect to database
+    await connectToDatabase()
+
+    // Transform and save all jobs to database
+    const now = new Date()
+    const jobsToSave = scraperData.jobs.map((job) => ({
+      userId: user!.id,
       title: job.title,
       company: job.company,
       location: job.location,
@@ -95,9 +102,54 @@ export async function POST(request: NextRequest) {
       jobType: job.job_type,
       isRemote: job.is_remote,
       site: job.site,
-      // Score fields (will be populated via SSE)
-      compatibilityScore: undefined,
+      status: 'scraped' as const,
+      scrapedAt: now,
+      savedAt: now,
       scoreStatus: 'pending' as const,
+    }))
+
+    // Use insertMany for efficiency, but skip duplicates based on jobUrl
+    // For each job, check if it already exists (same user + jobUrl)
+    const savedJobs = []
+    for (const jobData of jobsToSave) {
+      // Try to find existing job with same URL for this user
+      const existingJob = jobData.jobUrl
+        ? await ScrapedJob.findOne({
+            userId: user!.id,
+            jobUrl: jobData.jobUrl,
+          })
+        : null
+
+      if (existingJob) {
+        // Job already exists, return existing one
+        savedJobs.push(existingJob)
+      } else {
+        // Create new job
+        const newJob = await ScrapedJob.create(jobData)
+        savedJobs.push(newJob)
+      }
+    }
+
+    // Transform to frontend format
+    const jobs = savedJobs.map((job) => ({
+      _id: job._id.toString(),
+      title: job.title,
+      company: job.company,
+      location: job.location,
+      jobUrl: job.jobUrl,
+      description: job.description,
+      salaryMin: job.salaryMin,
+      salaryMax: job.salaryMax,
+      salaryCurrency: job.salaryCurrency,
+      datePosted: job.datePosted,
+      jobType: job.jobType,
+      isRemote: job.isRemote,
+      site: job.site,
+      status: job.status,
+      scrapedAt: job.scrapedAt,
+      savedAt: job.savedAt,
+      compatibilityScore: job.compatibilityScore,
+      scoreStatus: job.scoreStatus,
     }))
 
     return NextResponse.json({

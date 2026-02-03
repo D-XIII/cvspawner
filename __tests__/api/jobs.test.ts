@@ -46,6 +46,9 @@ vi.mock('@/models/ScrapedJob', () => {
     }),
     create: vi.fn().mockImplementation((data) => Promise.resolve({ _id: 'newjob', ...data })),
     findOneAndDelete: vi.fn().mockResolvedValue(mockJobs[0]),
+    findOneAndUpdate: vi.fn().mockResolvedValue(mockJobs[0]),
+    deleteMany: vi.fn().mockResolvedValue({ deletedCount: 0 }),
+    findOne: vi.fn().mockResolvedValue(null),
   }
   return { default: mockModel }
 })

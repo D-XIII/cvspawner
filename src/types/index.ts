@@ -95,6 +95,7 @@ export type ApiResponse<T> = {
 
 // Job Scraping types
 export type ScoreStatus = 'pending' | 'calculating' | 'completed' | 'error'
+export type JobStatus = 'scraped' | 'saved' | 'applied'
 
 // Detailed score types
 export interface ExperienceMatch {
@@ -129,6 +130,10 @@ export interface ScrapedJob {
   isRemote: boolean
   site: string
   savedAt?: Date
+  // Job lifecycle status
+  status?: JobStatus
+  scrapedAt?: Date
+  appliedAt?: Date
   // Compatibility score fields
   compatibilityScore?: number
   scoreStatus?: ScoreStatus
