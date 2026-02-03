@@ -10,6 +10,7 @@ from scoring import (
     prepare_job_text,
     calculate_score,
     calculate_batch_scores,
+    calculate_detailed_score,
     get_model_status,
 )
 
@@ -112,6 +113,24 @@ class BatchScoreResult(BaseModel):
 
 class BatchScoreResponse(BaseModel):
     results: List[BatchScoreResult]
+    message: Optional[str] = None
+
+
+# Detailed scoring models
+class ExperienceMatch(BaseModel):
+    title: str
+    company: str
+    score: float
+    relevant: bool
+
+
+class DetailedScoreResponse(BaseModel):
+    globalScore: float
+    experienceMatches: List[ExperienceMatch]
+    matchedKeywords: List[str]
+    missingKeywords: List[str]
+    matchedSkills: List[str]
+    totalKeywords: int
     message: Optional[str] = None
 
 
@@ -279,6 +298,47 @@ async def score_jobs_batch(request: BatchScoreRequest):
         raise HTTPException(
             status_code=500,
             detail=f"Batch scoring failed: {str(e)}"
+        )
+
+
+@app.post("/score-detailed", response_model=DetailedScoreResponse)
+async def score_job_detailed(request: ScoreRequest):
+    """
+    Calculate detailed compatibility score with explanations.
+
+    Returns global score plus breakdown of:
+    - Which experiences match the job
+    - Which keywords from the job are in the CV
+    - Which keywords are missing
+    """
+    try:
+        # Convert Pydantic models to dicts
+        cv_dict = {
+            "profile": request.cv_data.profile.model_dump() if request.cv_data.profile else None,
+            "experiences": [e.model_dump() for e in request.cv_data.experiences],
+            "skills": [s.model_dump() for s in request.cv_data.skills]
+        }
+
+        job_dict = request.job.model_dump()
+
+        # Calculate detailed score
+        result = calculate_detailed_score(cv_dict, job_dict, threshold=50.0)
+
+        return DetailedScoreResponse(
+            globalScore=result["globalScore"],
+            experienceMatches=[
+                ExperienceMatch(**exp) for exp in result["experienceMatches"]
+            ],
+            matchedKeywords=result["matchedKeywords"],
+            missingKeywords=result["missingKeywords"],
+            matchedSkills=result["matchedSkills"],
+            totalKeywords=result["totalKeywords"]
+        )
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Detailed scoring failed: {str(e)}"
         )
 
 

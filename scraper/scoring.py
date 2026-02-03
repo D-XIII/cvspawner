@@ -185,3 +185,220 @@ def calculate_batch_scores(cv_text: str, jobs: list[dict]) -> list[dict]:
         })
 
     return results
+
+
+import re
+
+
+def extract_keywords(text: str, max_keywords: int = 20) -> list[str]:
+    """
+    Extract technical keywords and proper nouns from text.
+
+    Args:
+        text: Text to extract keywords from
+        max_keywords: Maximum number of keywords to return
+
+    Returns:
+        List of unique keywords
+    """
+    if not text:
+        return []
+
+    # Common tech keywords pattern (languages, frameworks, tools)
+    tech_patterns = [
+        # Programming languages
+        r'\b(Python|JavaScript|TypeScript|Java|C\+\+|C#|Go|Rust|Ruby|PHP|Swift|Kotlin|Scala|R)\b',
+        # Frameworks & Libraries
+        r'\b(React|Angular|Vue|Next\.?js|Node\.?js|Django|Flask|FastAPI|Spring|Rails|Laravel|Express)\b',
+        # Databases
+        r'\b(MongoDB|PostgreSQL|MySQL|Redis|Elasticsearch|SQLite|Oracle|Cassandra|DynamoDB)\b',
+        # Cloud & DevOps
+        r'\b(AWS|Azure|GCP|Docker|Kubernetes|K8s|Terraform|Jenkins|GitLab|GitHub|CI/CD)\b',
+        # Tools & Concepts
+        r'\b(Git|REST|GraphQL|API|Agile|Scrum|TDD|DevOps|Microservices|Linux|Unix)\b',
+        # Data & ML
+        r'\b(Machine Learning|ML|AI|Deep Learning|TensorFlow|PyTorch|Pandas|NumPy|SQL|NoSQL)\b',
+    ]
+
+    keywords = set()
+    text_lower = text.lower()
+
+    # Extract tech keywords (case-insensitive matching, preserve original case)
+    for pattern in tech_patterns:
+        matches = re.findall(pattern, text, re.IGNORECASE)
+        for match in matches:
+            keywords.add(match)
+
+    # Extract capitalized words (potential proper nouns, tools, acronyms)
+    # Match words with 2+ uppercase letters or starting with uppercase
+    capitalized = re.findall(r'\b([A-Z][a-zA-Z]*(?:\s+[A-Z][a-zA-Z]*)?)\b', text)
+    for word in capitalized:
+        # Filter out common words and short words
+        if len(word) > 2 and word.lower() not in {'the', 'and', 'for', 'with', 'are', 'you', 'our', 'will', 'can', 'has', 'have', 'this', 'that', 'from', 'they', 'been', 'would', 'could', 'should', 'about', 'into', 'your', 'their', 'what', 'when', 'where', 'which', 'who', 'how', 'all', 'each', 'other', 'some', 'such', 'than', 'then', 'these', 'those', 'very', 'just', 'over', 'also', 'after', 'before', 'more', 'most', 'only', 'same', 'any', 'both', 'few', 'own', 'well', 'back', 'being', 'experience', 'working', 'work', 'team', 'company', 'position', 'role', 'job', 'years', 'year', 'ability', 'skills', 'strong', 'good', 'great', 'excellent'}:
+            keywords.add(word)
+
+    # Extract years of experience patterns
+    years_exp = re.findall(r'(\d+\+?\s*(?:years?|ans?)\s*(?:of\s+)?(?:experience|expérience)?)', text, re.IGNORECASE)
+    for exp in years_exp:
+        keywords.add(exp.strip())
+
+    # Limit and return
+    return list(keywords)[:max_keywords]
+
+
+def calculate_experience_scores(experiences: list[dict], job_text: str, threshold: float = 50.0) -> list[dict]:
+    """
+    Calculate how well each experience matches the job.
+
+    Args:
+        experiences: List of experience dicts with title, company, description
+        job_text: Prepared job text
+        threshold: Minimum score to be considered relevant
+
+    Returns:
+        List of experiences with their scores, sorted by score descending
+    """
+    if not experiences or not job_text:
+        return []
+
+    model = get_model()
+
+    # Prepare experience texts
+    exp_texts = []
+    for exp in experiences:
+        parts = []
+        if exp.get("title"):
+            parts.append(exp["title"])
+        if exp.get("company"):
+            parts.append(f"at {exp['company']}")
+        if exp.get("description"):
+            parts.append(exp["description"])
+        exp_texts.append(" ".join(parts) if parts else "")
+
+    # Filter out empty experiences
+    valid_indices = [i for i, t in enumerate(exp_texts) if t.strip()]
+    if not valid_indices:
+        return []
+
+    valid_texts = [exp_texts[i] for i in valid_indices]
+
+    # Encode all at once
+    all_texts = [job_text] + valid_texts
+    embeddings = model.encode(all_texts, convert_to_tensor=True)
+
+    job_embedding = embeddings[0]
+    exp_embeddings = embeddings[1:]
+
+    # Calculate scores
+    results = []
+    for i, idx in enumerate(valid_indices):
+        similarity = cos_sim(job_embedding, exp_embeddings[i]).item()
+        score = max(0, min(100, similarity * 100))
+        score = round(score, 1)
+
+        exp = experiences[idx]
+        results.append({
+            "title": exp.get("title", "Unknown"),
+            "company": exp.get("company", ""),
+            "score": score,
+            "relevant": score >= threshold
+        })
+
+    # Sort by score descending
+    results.sort(key=lambda x: x["score"], reverse=True)
+    return results
+
+
+def find_matching_keywords(cv_data: dict, job_keywords: list[str]) -> tuple[list[str], list[str]]:
+    """
+    Find which job keywords are present in the CV and which are missing.
+
+    Args:
+        cv_data: CV data dict with profile, experiences, skills
+        job_keywords: List of keywords extracted from the job
+
+    Returns:
+        Tuple of (matched_keywords, missing_keywords)
+    """
+    if not job_keywords:
+        return [], []
+
+    # Build CV text for searching
+    cv_parts = []
+
+    profile = cv_data.get("profile")
+    if profile:
+        if profile.get("title"):
+            cv_parts.append(profile["title"])
+        if profile.get("summary"):
+            cv_parts.append(profile["summary"])
+
+    for exp in cv_data.get("experiences", []):
+        if exp.get("title"):
+            cv_parts.append(exp["title"])
+        if exp.get("description"):
+            cv_parts.append(exp["description"])
+
+    for skill in cv_data.get("skills", []):
+        if skill.get("name"):
+            cv_parts.append(skill["name"])
+
+    cv_text_lower = " ".join(cv_parts).lower()
+
+    matched = []
+    missing = []
+
+    for keyword in job_keywords:
+        keyword_lower = keyword.lower()
+        # Check for exact match or partial match
+        if keyword_lower in cv_text_lower or any(keyword_lower in part.lower() for part in cv_parts):
+            matched.append(keyword)
+        else:
+            missing.append(keyword)
+
+    return matched, missing
+
+
+def calculate_detailed_score(cv_data: dict, job: dict, threshold: float = 50.0) -> dict:
+    """
+    Calculate detailed compatibility score with explanations.
+
+    Args:
+        cv_data: CV data dict with profile, experiences, skills
+        job: Job dict with title, company, description
+        threshold: Minimum score for experience to be relevant
+
+    Returns:
+        Detailed score result with global score, experience matches, and keywords
+    """
+    cv_text = prepare_cv_text(cv_data)
+    job_text = prepare_job_text(job)
+
+    # Calculate global score
+    global_score = calculate_score(cv_text, job_text)
+
+    # Calculate experience scores
+    experiences = cv_data.get("experiences", [])
+    experience_matches = calculate_experience_scores(experiences, job_text, threshold)
+
+    # Extract job keywords
+    job_description = job.get("description", "")
+    job_title = job.get("title", "")
+    job_full_text = f"{job_title} {job_description}"
+    job_keywords = extract_keywords(job_full_text)
+
+    # Find matched and missing keywords
+    matched_keywords, missing_keywords = find_matching_keywords(cv_data, job_keywords)
+
+    # Get user's skills that match
+    user_skills = [s.get("name") for s in cv_data.get("skills", []) if s.get("name")]
+    matched_skills = [s for s in user_skills if any(s.lower() in kw.lower() or kw.lower() in s.lower() for kw in job_keywords)]
+
+    return {
+        "globalScore": global_score,
+        "experienceMatches": experience_matches,
+        "matchedKeywords": matched_keywords,
+        "missingKeywords": missing_keywords,
+        "matchedSkills": matched_skills,
+        "totalKeywords": len(job_keywords)
+    }

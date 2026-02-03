@@ -92,10 +92,10 @@ export async function POST(request: NextRequest) {
         }
 
         try {
-          // Score each job individually and stream results
+          // Score each job individually with detailed analysis and stream results
           for (const job of jobs) {
             try {
-              const scoreResponse = await fetch(`${SCRAPER_URL}/score`, {
+              const scoreResponse = await fetch(`${SCRAPER_URL}/score-detailed`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -113,8 +113,16 @@ export async function POST(request: NextRequest) {
                 const scoreData = await scoreResponse.json()
                 sendEvent('score', {
                   index: job.index,
-                  score: scoreData.score,
+                  score: scoreData.globalScore,
                   status: 'completed',
+                  details: {
+                    globalScore: scoreData.globalScore,
+                    experienceMatches: scoreData.experienceMatches,
+                    matchedKeywords: scoreData.matchedKeywords,
+                    missingKeywords: scoreData.missingKeywords,
+                    matchedSkills: scoreData.matchedSkills,
+                    totalKeywords: scoreData.totalKeywords,
+                  },
                 })
               } else {
                 sendEvent('score', {

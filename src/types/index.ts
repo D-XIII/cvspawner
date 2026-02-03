@@ -96,6 +96,23 @@ export type ApiResponse<T> = {
 // Job Scraping types
 export type ScoreStatus = 'pending' | 'calculating' | 'completed' | 'error'
 
+// Detailed score types
+export interface ExperienceMatch {
+  title: string
+  company: string
+  score: number
+  relevant: boolean
+}
+
+export interface ScoreDetails {
+  globalScore: number
+  experienceMatches: ExperienceMatch[]
+  matchedKeywords: string[]
+  missingKeywords: string[]
+  matchedSkills: string[]
+  totalKeywords: number
+}
+
 export interface ScrapedJob {
   _id?: string
   userId?: string
@@ -117,6 +134,7 @@ export interface ScrapedJob {
   scoreStatus?: ScoreStatus
   scoreCalculatedAt?: Date
   scoreError?: string
+  scoreDetails?: ScoreDetails
   createdAt?: Date
   updatedAt?: Date
 }

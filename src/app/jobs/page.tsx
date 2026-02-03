@@ -25,8 +25,9 @@ import Button from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import Modal from '@/components/ui/Modal'
 import CompatibilityBadge from '@/components/jobs/CompatibilityBadge'
+import ScoreDetailsModal from '@/components/jobs/ScoreDetailsModal'
 import ApplicationForm from '@/components/forms/ApplicationForm'
-import { ScrapedJob, ScrapeRequest, Application } from '@/types'
+import { ScrapedJob, ScrapeRequest, Application, ScoreDetails } from '@/types'
 
 const siteColors: Record<string, string> = {
   indeed: 'bg-blue-500/20 text-blue-400',
@@ -52,6 +53,10 @@ export default function JobsPage() {
   const [applicationModalOpen, setApplicationModalOpen] = useState(false)
   const [selectedJobForApplication, setSelectedJobForApplication] = useState<ScrapedJob | null>(null)
   const [editingApplication, setEditingApplication] = useState<Application | undefined>()
+
+  // Score details modal state
+  const [scoreDetailsModalOpen, setScoreDetailsModalOpen] = useState(false)
+  const [selectedJobForScore, setSelectedJobForScore] = useState<ScrapedJob | null>(null)
 
   // Search form state
   const [searchTerm, setSearchTerm] = useState('')
@@ -200,7 +205,7 @@ export default function JobsPage() {
             const data = JSON.parse(line.slice(6))
 
             if (eventType === 'score') {
-              // Update the specific job's score
+              // Update the specific job's score with details
               setScrapedJobs((prev) =>
                 prev.map((job, idx) =>
                   idx === data.index
@@ -209,6 +214,7 @@ export default function JobsPage() {
                         compatibilityScore: data.score,
                         scoreStatus: data.status,
                         scoreError: data.error,
+                        scoreDetails: data.details as ScoreDetails | undefined,
                       }
                     : job
                 )
@@ -304,6 +310,11 @@ export default function JobsPage() {
     } finally {
       setSaving(null)
     }
+  }
+
+  const handleViewScoreDetails = (job: ScrapedJob) => {
+    setSelectedJobForScore(job)
+    setScoreDetailsModalOpen(true)
   }
 
   const handleApplyToJob = (job: ScrapedJob) => {
@@ -430,6 +441,8 @@ export default function JobsPage() {
                 score={job.compatibilityScore}
                 status={job.scoreStatus}
                 error={job.scoreError}
+                hasDetails={!!job.scoreDetails}
+                onDetailsClick={() => handleViewScoreDetails(job)}
               />
             </div>
             <CardDescription className="flex items-center gap-2 mt-1">
@@ -804,6 +817,18 @@ export default function JobsPage() {
           }}
         />
       </Modal>
+
+      {/* Score Details Modal */}
+      <ScoreDetailsModal
+        isOpen={scoreDetailsModalOpen}
+        onClose={() => {
+          setScoreDetailsModalOpen(false)
+          setSelectedJobForScore(null)
+        }}
+        jobTitle={selectedJobForScore?.title || ''}
+        company={selectedJobForScore?.company || ''}
+        details={selectedJobForScore?.scoreDetails}
+      />
     </div>
   )
 }
