@@ -20,7 +20,7 @@ spec:
     spec:
       containers:
         - name: scraper
-          image: ghcr.io/OWNER/cvspawner-scraper:main
+          image: ghcr.io/D-XIII/cvspawner-scraper:main
           imagePullPolicy: Always
           ports:
             - name: http

@@ -20,7 +20,7 @@ labels:
     includeSelectors: false
 
 images:
-  - name: ghcr.io/OWNER/cvspawner
+  - name: ghcr.io/D-XIII/cvspawner
     newTag: main
-  - name: ghcr.io/OWNER/cvspawner-scraper
+  - name: ghcr.io/D-XIII/cvspawner-scraper
     newTag: main

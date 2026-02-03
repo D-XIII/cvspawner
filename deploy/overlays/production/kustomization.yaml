@@ -10,14 +10,14 @@ patches:
   - path: patches/replicas.yaml
   - path: patches/resources.yaml
 
-# Remplacez OWNER par votre username/org GitHub
+# Remplacez par le tag après le premier build
 # Remplacez TAG par le tag réel après le premier build
 images:
-  - name: ghcr.io/OWNER/cvspawner
-    newName: ghcr.io/OWNER/cvspawner
+  - name: ghcr.io/D-XIII/cvspawner
+    newName: ghcr.io/D-XIII/cvspawner
     newTag: sha-abc1234  # Sera mis à jour automatiquement ou manuellement
-  - name: ghcr.io/OWNER/cvspawner-scraper
-    newName: ghcr.io/OWNER/cvspawner-scraper
+  - name: ghcr.io/D-XIII/cvspawner-scraper
+    newName: ghcr.io/D-XIII/cvspawner-scraper
     newTag: sha-abc1234  # Sera mis à jour automatiquement ou manuellement
 
 # Pour gérer les secrets de manière sécurisée, utilisez:

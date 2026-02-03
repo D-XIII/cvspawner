@@ -82,7 +82,7 @@ git push -u origin main
 ### 2. Configurer les images
 
 Dans `base/kustomization.yaml` et `overlays/production/kustomization.yaml`, remplacez:
-- `OWNER` par votre username/organisation GitHub
+- `D-XIII` par votre username/organisation GitHub
 
 ### 3. Configurer les secrets
 
@@ -148,7 +148,7 @@ Le workflow GitHub Actions dans le repo principal:
 Pour déclencher un déploiement, mettez à jour le tag dans `overlays/production/kustomization.yaml`:
 ```yaml
 images:
-  - name: ghcr.io/OWNER/cvspawner
+  - name: ghcr.io/D-XIII/cvspawner
     newTag: sha-abc1234  # Nouveau tag
 ```
 
@@ -158,7 +158,7 @@ images:
 # Ajouter cette annotation à l'Application ArgoCD
 metadata:
   annotations:
-    argocd-image-updater.argoproj.io/image-list: app=ghcr.io/OWNER/cvspawner:sha-*
+    argocd-image-updater.argoproj.io/image-list: app=ghcr.io/D-XIII/cvspawner:sha-*
     argocd-image-updater.argoproj.io/app.update-strategy: latest
 ```
 

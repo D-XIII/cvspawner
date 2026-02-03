@@ -10,7 +10,7 @@ spec:
 
   source:
     # Remplacez par l'URL de votre repo de déploiement
-    repoURL: https://github.com/OWNER/cvspawner-deploy.git
+    repoURL: https://github.com/D-XIII/cvspawner-deploy.git
     targetRevision: HEAD
     path: overlays/production
 
@@ -52,7 +52,7 @@ spec:
   project: default
 
   source:
-    repoURL: https://github.com/OWNER/cvspawner-deploy.git
+    repoURL: https://github.com/D-XIII/cvspawner-deploy.git
     targetRevision: HEAD
     path: mongodb
 

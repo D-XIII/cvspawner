@@ -20,7 +20,7 @@ spec:
     spec:
       containers:
         - name: app
-          image: ghcr.io/OWNER/cvspawner:main
+          image: ghcr.io/D-XIII/cvspawner:main
           imagePullPolicy: Always
           ports:
             - name: http
