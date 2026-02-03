@@ -23,6 +23,7 @@ import {
 import Card, { CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
+import LocationAutocomplete from '@/components/ui/LocationAutocomplete'
 import Modal from '@/components/ui/Modal'
 import CompatibilityBadge from '@/components/jobs/CompatibilityBadge'
 import ScoreDetailsModal from '@/components/jobs/ScoreDetailsModal'
@@ -622,11 +623,11 @@ export default function JobsPage() {
                   icon={<Search className="w-4 h-4" />}
                   required
                 />
-                <Input
+                <LocationAutocomplete
                   label="Location"
                   placeholder="e.g., Switzerland, Geneva, Zurich"
                   value={location}
-                  onChange={(e) => setLocation(e.target.value)}
+                  onChange={setLocation}
                   icon={<MapPin className="w-4 h-4" />}
                 />
               </div>
