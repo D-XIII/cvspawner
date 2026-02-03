@@ -14,11 +14,12 @@ import {
   Globe,
   DollarSign,
   Trash2,
-  Filter,
   Sparkles,
   RefreshCw,
   Send,
   CheckCircle,
+  Star,
+  Clock,
 } from 'lucide-react'
 import Card, { CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
@@ -28,7 +29,7 @@ import Modal from '@/components/ui/Modal'
 import CompatibilityBadge from '@/components/jobs/CompatibilityBadge'
 import ScoreDetailsModal from '@/components/jobs/ScoreDetailsModal'
 import ApplicationForm from '@/components/forms/ApplicationForm'
-import { ScrapedJob, ScrapeRequest, Application, ScoreDetails } from '@/types'
+import { ScrapedJob, ScrapeRequest, Application, ScoreDetails, JobStatus } from '@/types'
 
 const siteColors: Record<string, string> = {
   indeed: 'bg-blue-500/20 text-blue-400',
@@ -38,14 +39,16 @@ const siteColors: Record<string, string> = {
   google: 'bg-red-500/20 text-red-400',
 }
 
+type JobFilter = 'all' | 'saved' | 'applied'
+
 export default function JobsPage() {
-  const [savedJobs, setSavedJobs] = useState<ScrapedJob[]>([])
-  const [scrapedJobs, setScrapedJobs] = useState<ScrapedJob[]>([])
+  // All jobs from database
+  const [jobs, setJobs] = useState<ScrapedJob[]>([])
   const [loading, setLoading] = useState(true)
   const [scraping, setScraping] = useState(false)
-  const [saving, setSaving] = useState<string | null>(null)
+  const [updatingStatus, setUpdatingStatus] = useState<string | null>(null)
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
-  const [activeTab, setActiveTab] = useState<'search' | 'saved'>('search')
+  const [jobFilter, setJobFilter] = useState<JobFilter>('all')
   const [calculatingScores, setCalculatingScores] = useState(false)
   const [scoreStats, setScoreStats] = useState<{ pending: number; calculating: number; completed: number; error: number } | null>(null)
 
@@ -102,19 +105,19 @@ export default function JobsPage() {
   }, [])
 
   useEffect(() => {
-    fetchSavedJobs()
+    fetchJobs()
     fetchScoreStats()
   }, [])
 
-  // Fetch applications when saved jobs change
+  // Fetch applications when jobs change
   useEffect(() => {
-    if (savedJobs.length > 0) {
+    if (jobs.length > 0) {
       fetchApplicationsForJobs()
     }
-  }, [savedJobs])
+  }, [jobs])
 
   const fetchApplicationsForJobs = async () => {
-    const jobIds = savedJobs.map((job) => job._id).filter(Boolean)
+    const jobIds = jobs.map((job) => job._id).filter(Boolean)
     if (jobIds.length === 0) return
 
     try {
@@ -132,7 +135,7 @@ export default function JobsPage() {
   useEffect(() => {
     if (scoreStats?.calculating && scoreStats.calculating > 0) {
       const interval = setInterval(() => {
-        fetchSavedJobs()
+        fetchJobs()
         fetchScoreStats()
       }, 3000) // Poll every 3 seconds
       return () => clearInterval(interval)
@@ -164,7 +167,7 @@ export default function JobsPage() {
       if (data.success) {
         setMessage({ type: 'success', text: data.message })
         // Refresh jobs and stats
-        await Promise.all([fetchSavedJobs(), fetchScoreStats()])
+        await Promise.all([fetchJobs(), fetchScoreStats()])
       } else {
         setMessage({ type: 'error', text: data.error })
       }
@@ -175,25 +178,26 @@ export default function JobsPage() {
     }
   }
 
-  const fetchSavedJobs = async () => {
+  const fetchJobs = async () => {
     try {
       const res = await fetch('/api/jobs')
       const data = await res.json()
       if (data.success) {
-        setSavedJobs(data.data)
+        setJobs(data.data)
       }
     } catch {
-      console.error('Failed to fetch saved jobs')
+      console.error('Failed to fetch jobs')
     } finally {
       setLoading(false)
     }
   }
 
   // Stream scores via SSE for scraped jobs
-  const streamScores = async (jobs: ScrapedJob[]) => {
+  const streamScores = async (scrapedJobs: ScrapedJob[]) => {
     try {
-      const jobsForScoring = jobs.map((job, index) => ({
+      const jobsForScoring = scrapedJobs.map((job, index) => ({
         index,
+        id: job._id, // Include job ID for database updates
         title: job.title,
         company: job.company,
         description: job.description,
@@ -242,20 +246,23 @@ export default function JobsPage() {
             const data = JSON.parse(line.slice(6))
 
             if (eventType === 'score') {
-              // Update the specific job's score with details
-              setScrapedJobs((prev) =>
-                prev.map((job, idx) =>
-                  idx === data.index
-                    ? {
-                        ...job,
-                        compatibilityScore: data.score,
-                        scoreStatus: data.status,
-                        scoreError: data.error,
-                        scoreDetails: data.details as ScoreDetails | undefined,
-                      }
-                    : job
+              // Update jobs state
+              const jobId = scrapedJobs[data.index]?._id
+              if (jobId) {
+                setJobs((prev) =>
+                  prev.map((job) =>
+                    job._id === jobId
+                      ? {
+                          ...job,
+                          compatibilityScore: data.score,
+                          scoreStatus: data.status,
+                          scoreError: data.error,
+                          scoreDetails: data.details as ScoreDetails | undefined,
+                        }
+                      : job
+                  )
                 )
-              )
+              }
             }
           }
         }
@@ -275,7 +282,6 @@ export default function JobsPage() {
 
     setScraping(true)
     setMessage(null)
-    setScrapedJobs([])
 
     try {
       const request: ScrapeRequest = {
@@ -294,19 +300,27 @@ export default function JobsPage() {
       const data = await res.json()
 
       if (data.success) {
-        // Show jobs immediately with pending scores
-        setScrapedJobs(data.jobs)
+        // Jobs are now auto-saved to DB with status 'scraped'
+        // Add to jobs list (at the beginning)
+        setJobs((prev) => {
+          const existingIds = new Set(prev.map((j) => j._id))
+          const newJobs = data.jobs.filter((j: ScrapedJob) => !existingIds.has(j._id))
+          return [...newJobs, ...prev]
+        })
         setMessage({
           type: 'success',
-          text: `Found ${data.total} jobs${data.message ? ` - ${data.message}` : ''}`,
+          text: `${data.total} offres trouvées${data.message ? ` - ${data.message}` : ''}`,
         })
         setScraping(false)
 
         // Start streaming scores in background
         if (data.jobs.length > 0) {
-          // Mark all jobs as calculating
-          setScrapedJobs((prev) =>
-            prev.map((job) => ({ ...job, scoreStatus: 'calculating' as const }))
+          // Mark new jobs as calculating
+          const newJobIds = new Set(data.jobs.map((j: ScrapedJob) => j._id))
+          setJobs((prev) =>
+            prev.map((job) =>
+              newJobIds.has(job._id) ? { ...job, scoreStatus: 'calculating' as const } : job
+            )
           )
           streamScores(data.jobs)
         }
@@ -320,32 +334,44 @@ export default function JobsPage() {
     }
   }
 
-  const handleSaveJob = async (job: ScrapedJob) => {
-    const jobKey = `${job.title}-${job.company}`
-    setSaving(jobKey)
+  const handleUpdateJobStatus = async (job: ScrapedJob, newStatus: JobStatus) => {
+    if (!job._id) return
+
+    setUpdatingStatus(job._id)
 
     try {
-      const res = await fetch('/api/jobs', {
-        method: 'POST',
+      const res = await fetch(`/api/jobs/${job._id}`, {
+        method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(job),
+        body: JSON.stringify({ status: newStatus }),
       })
 
       const data = await res.json()
 
       if (data.success) {
-        setSavedJobs([data.data, ...savedJobs])
-        setMessage({ type: 'success', text: 'Job saved! Score will be calculated in background.' })
+        // Update local state
+        setJobs((prev) =>
+          prev.map((j) =>
+            j._id === job._id
+              ? { ...j, status: newStatus, appliedAt: newStatus === 'applied' ? new Date() : j.appliedAt }
+              : j
+          )
+        )
+
+        const statusMessages: Record<JobStatus, string> = {
+          scraped: 'Retiré des favoris',
+          saved: 'Ajouté aux favoris!',
+          applied: 'Marqué comme postulé!',
+        }
+        setMessage({ type: 'success', text: statusMessages[newStatus] })
         setTimeout(() => setMessage(null), 3000)
-        // Refresh score stats
-        fetchScoreStats()
       } else {
         setMessage({ type: 'error', text: data.error })
       }
     } catch {
-      setMessage({ type: 'error', text: 'Failed to save job' })
+      setMessage({ type: 'error', text: 'Échec de la mise à jour' })
     } finally {
-      setSaving(null)
+      setUpdatingStatus(null)
     }
   }
 
@@ -397,46 +423,49 @@ export default function JobsPage() {
             ...prev,
             [selectedJobForApplication._id!]: data.data,
           }))
+
+          // Also update job status to 'applied' if this is a new application
+          if (!isEditing) {
+            handleUpdateJobStatus(selectedJobForApplication, 'applied')
+          }
         }
         setApplicationModalOpen(false)
         setSelectedJobForApplication(null)
         setEditingApplication(undefined)
         setMessage({
           type: 'success',
-          text: isEditing ? 'Application updated!' : 'Application created!',
+          text: isEditing ? 'Candidature mise à jour!' : 'Candidature créée!',
         })
         setTimeout(() => setMessage(null), 3000)
       } else {
         setMessage({ type: 'error', text: data.error })
       }
     } catch {
-      setMessage({ type: 'error', text: 'Failed to save application' })
+      setMessage({ type: 'error', text: 'Échec de la sauvegarde' })
     }
   }
 
   const handleDeleteJob = async (id: string) => {
-    if (!confirm('Remove this saved job?')) return
+    if (!confirm('Supprimer ce job définitivement ?')) return
 
     try {
       const res = await fetch(`/api/jobs/${id}`, { method: 'DELETE' })
       const data = await res.json()
 
       if (data.success) {
-        setSavedJobs(savedJobs.filter((j) => j._id !== id))
-        setMessage({ type: 'success', text: 'Job removed' })
+        setJobs(jobs.filter((j) => j._id !== id))
+        setMessage({ type: 'success', text: 'Job supprimé' })
         setTimeout(() => setMessage(null), 2000)
       } else {
         setMessage({ type: 'error', text: data.error })
       }
     } catch {
-      setMessage({ type: 'error', text: 'Failed to delete job' })
+      setMessage({ type: 'error', text: 'Échec de la suppression' })
     }
   }
 
-  const isJobSaved = (job: ScrapedJob) => {
-    return savedJobs.some(
-      (saved) => saved.title === job.title && saved.company === job.company && saved.site === job.site
-    )
+  const isJobFavorite = (job: ScrapedJob) => {
+    return job.status === 'saved' || job.status === 'applied'
   }
 
   const formatSalary = (job: ScrapedJob) => {
@@ -449,9 +478,11 @@ export default function JobsPage() {
     return `Up to ${currency} ${job.salaryMax?.toLocaleString()}`
   }
 
-  const JobCard = ({ job, showSaveButton = false, showDeleteButton = false, showApplyButton = false }: { job: ScrapedJob; showSaveButton?: boolean; showDeleteButton?: boolean; showApplyButton?: boolean }) => {
+  const JobCard = ({ job, showFavoriteButton = false, showDeleteButton = false, showApplyButton = false }: { job: ScrapedJob; showFavoriteButton?: boolean; showDeleteButton?: boolean; showApplyButton?: boolean }) => {
     const application = job._id ? applicationsByJob[job._id] : undefined
-    const hasApplied = !!application
+    const hasApplied = job.status === 'applied' || !!application
+    const isFavorite = isJobFavorite(job)
+    const isUpdating = updatingStatus === job._id
 
     return (
     <Card hover className="max-w-full overflow-hidden">
@@ -468,10 +499,22 @@ export default function JobsPage() {
                   Remote
                 </span>
               )}
+              {job.status === 'saved' && (
+                <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-500/20 text-yellow-400 flex items-center gap-1">
+                  <Star className="w-3 h-3" />
+                  Favori
+                </span>
+              )}
               {hasApplied && (
                 <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-500/20 text-indigo-400 flex items-center gap-1">
                   <CheckCircle className="w-3 h-3" />
-                  Applied
+                  Postulé
+                </span>
+              )}
+              {job.status === 'scraped' && (
+                <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-gray-500/20 text-gray-400 flex items-center gap-1">
+                  <Clock className="w-3 h-3" />
+                  Récent
                 </span>
               )}
               <CompatibilityBadge
@@ -534,28 +577,25 @@ export default function JobsPage() {
           </a>
         )}
         <div className="flex-1" />
-        {showSaveButton && (
+        {showFavoriteButton && (
           <Button
-            variant={isJobSaved(job) ? 'secondary' : 'primary'}
+            variant={isFavorite ? 'secondary' : 'ghost'}
             size="sm"
-            onClick={() => handleSaveJob(job)}
-            disabled={isJobSaved(job) || saving === `${job.title}-${job.company}`}
+            onClick={() => handleUpdateJobStatus(job, isFavorite ? 'scraped' : 'saved')}
+            disabled={isUpdating}
             className="gap-1"
           >
-            {isJobSaved(job) ? (
+            {isUpdating ? (
+              <Loader2 className="w-3 h-3 animate-spin" />
+            ) : isFavorite ? (
               <>
-                <BookmarkCheck className="w-3 h-3" />
-                Saved
-              </>
-            ) : saving === `${job.title}-${job.company}` ? (
-              <>
-                <Loader2 className="w-3 h-3 animate-spin" />
-                Saving...
+                <Star className="w-3 h-3 fill-yellow-400 text-yellow-400" />
+                Favori
               </>
             ) : (
               <>
-                <Bookmark className="w-3 h-3" />
-                Save
+                <Star className="w-3 h-3" />
+                Ajouter aux favoris
               </>
             )}
           </Button>
@@ -568,7 +608,7 @@ export default function JobsPage() {
             className="gap-1"
           >
             <Trash2 className="w-3 h-3" />
-            Remove
+            Supprimer
           </Button>
         )}
         {showApplyButton && (
@@ -579,7 +619,7 @@ export default function JobsPage() {
             className="gap-1"
           >
             <Send className="w-3 h-3" />
-            {hasApplied ? 'View Application' : 'Apply'}
+            {hasApplied ? 'Voir candidature' : 'Postuler'}
           </Button>
         )}
       </CardFooter>
@@ -605,32 +645,6 @@ export default function JobsPage() {
         </p>
       </motion.div>
 
-      {/* Tabs */}
-      <div className="flex gap-2 mb-6">
-        <button
-          onClick={() => setActiveTab('search')}
-          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-            activeTab === 'search'
-              ? 'bg-primary text-white'
-              : 'bg-card border border-border text-muted hover:text-foreground'
-          }`}
-        >
-          <Search className="w-4 h-4 inline mr-2" />
-          Search Jobs
-        </button>
-        <button
-          onClick={() => setActiveTab('saved')}
-          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-            activeTab === 'saved'
-              ? 'bg-primary text-white'
-              : 'bg-card border border-border text-muted hover:text-foreground'
-          }`}
-        >
-          <Bookmark className="w-4 h-4 inline mr-2" />
-          Saved Jobs ({savedJobs.length})
-        </button>
-      </div>
-
       {message && (
         <motion.div
           initial={{ opacity: 0, y: -10 }}
@@ -645,186 +659,186 @@ export default function JobsPage() {
         </motion.div>
       )}
 
-      {activeTab === 'search' && (
-        <>
-          {/* Search Form */}
-          <Card className="mb-6">
-            <form onSubmit={handleScrape} className="space-y-4">
-              <div className="grid md:grid-cols-2 gap-4">
-                <Input
-                  label="Job Title / Keywords"
-                  placeholder="e.g., Software Engineer, React Developer"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  icon={<Search className="w-4 h-4" />}
-                  required
-                />
-                <LocationAutocomplete
-                  label="Location"
-                  placeholder="e.g., Switzerland, Geneva, Zurich"
-                  value={location}
-                  onChange={setLocation}
-                  icon={<MapPin className="w-4 h-4" />}
-                />
-              </div>
+      {/* Search Form */}
+      <Card className="mb-6">
+        <form onSubmit={handleScrape} className="space-y-4">
+          <div className="grid md:grid-cols-2 gap-4">
+            <Input
+              label="Titre / Mots-clés"
+              placeholder="ex: Software Engineer, React Developer"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              icon={<Search className="w-4 h-4" />}
+              required
+            />
+            <LocationAutocomplete
+              label="Localisation"
+              placeholder="ex: Switzerland, Geneva, Zurich"
+              value={location}
+              onChange={setLocation}
+              icon={<MapPin className="w-4 h-4" />}
+            />
+          </div>
 
-              <div className="flex flex-wrap items-end gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-1">
-                    Results
-                  </label>
-                  <select
-                    value={resultsWanted}
-                    onChange={(e) => setResultsWanted(Number(e.target.value))}
-                    className="px-3 py-2 bg-card border border-border rounded-lg text-foreground"
-                  >
-                    <option value={10}>10</option>
-                    <option value={20}>20</option>
-                    <option value={50}>50</option>
-                    <option value={100}>100</option>
-                  </select>
-                </div>
-
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={remoteOnly}
-                    onChange={(e) => setRemoteOnly(e.target.checked)}
-                    className="w-4 h-4 rounded border-border text-primary"
-                  />
-                  <span className="text-sm text-foreground">Remote only</span>
-                </label>
-
-                <div className="flex-1" />
-
-                <Button type="submit" disabled={scraping} loading={scraping} className="gap-2">
-                  <Search className="w-4 h-4" />
-                  {scraping ? 'Searching...' : 'Search Jobs'}
-                </Button>
-              </div>
-            </form>
-          </Card>
-
-          {/* Search Results */}
-          {scraping ? (
-            <div className="flex flex-col items-center justify-center py-20">
-              <Loader2 className="w-8 h-8 animate-spin text-primary mb-4" />
-              <p className="text-muted">Searching across job boards...</p>
-              <p className="text-sm text-muted">This may take a moment</p>
+          <div className="flex flex-wrap items-end gap-4">
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1">
+                Résultats
+              </label>
+              <select
+                value={resultsWanted}
+                onChange={(e) => setResultsWanted(Number(e.target.value))}
+                className="px-3 py-2 bg-card border border-border rounded-lg text-foreground"
+              >
+                <option value={10}>10</option>
+                <option value={20}>20</option>
+                <option value={50}>50</option>
+                <option value={100}>100</option>
+              </select>
             </div>
-          ) : scrapedJobs.length > 0 ? (
-            <div className="grid gap-4">
-              <AnimatePresence>
-                {scrapedJobs.map((job, index) => (
-                  <motion.div
-                    key={`${job.title}-${job.company}-${index}`}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: index * 0.05 }}
-                  >
-                    <JobCard job={job} showSaveButton />
-                  </motion.div>
-                ))}
-              </AnimatePresence>
-            </div>
-          ) : (
-            <Card className="text-center py-12">
-              <Search className="w-12 h-12 text-muted mx-auto mb-4" />
-              <h3 className="text-lg font-semibold text-foreground mb-2">Search for Jobs</h3>
-              <p className="text-muted">
-                Enter a job title and location to search across multiple job boards.
-              </p>
-            </Card>
-          )}
-        </>
-      )}
 
-      {activeTab === 'saved' && (
-        <>
-          {/* Score calculation controls */}
-          {savedJobs.length > 0 && (
-            <Card className="mb-6">
-              <div className="flex flex-wrap items-center justify-between gap-4">
-                <div>
-                  <h3 className="text-sm font-medium text-foreground flex items-center gap-2">
-                    <Sparkles className="w-4 h-4 text-primary" />
-                    CV Compatibility Scores
-                  </h3>
-                  <p className="text-xs text-muted mt-1">
-                    Calculate how well your CV matches each saved job.
-                  </p>
-                  {scoreStats && (
-                    <div className="flex gap-3 mt-2 text-xs text-muted">
-                      {scoreStats.pending > 0 && (
-                        <span>{scoreStats.pending} pending</span>
-                      )}
-                      {scoreStats.calculating > 0 && (
-                        <span className="text-blue-400">{scoreStats.calculating} calculating...</span>
-                      )}
-                      {scoreStats.completed > 0 && (
-                        <span className="text-green-400">{scoreStats.completed} completed</span>
-                      )}
-                      {scoreStats.error > 0 && (
-                        <span className="text-red-400">{scoreStats.error} errors</span>
-                      )}
-                    </div>
-                  )}
-                </div>
-                <Button
-                  onClick={handleCalculateScores}
-                  disabled={calculatingScores || (scoreStats?.pending === 0 && scoreStats?.error === 0)}
-                  loading={calculatingScores}
-                  className="gap-2"
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={remoteOnly}
+                onChange={(e) => setRemoteOnly(e.target.checked)}
+                className="w-4 h-4 rounded border-border text-primary"
+              />
+              <span className="text-sm text-foreground">Remote uniquement</span>
+            </label>
+
+            <div className="flex-1" />
+
+            <Button type="submit" disabled={scraping} loading={scraping} className="gap-2">
+              <Search className="w-4 h-4" />
+              {scraping ? 'Recherche...' : 'Rechercher'}
+            </Button>
+          </div>
+        </form>
+      </Card>
+
+      {/* Filters & Score calculation */}
+      <div className="flex flex-wrap items-center gap-4 mb-6">
+        <div className="flex gap-2">
+          <button
+            onClick={() => setJobFilter('all')}
+            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+              jobFilter === 'all'
+                ? 'bg-primary/20 text-primary border border-primary/30'
+                : 'bg-card border border-border text-muted hover:text-foreground'
+            }`}
+          >
+            Tous ({jobs.length})
+          </button>
+          <button
+            onClick={() => setJobFilter('saved')}
+            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5 ${
+              jobFilter === 'saved'
+                ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30'
+                : 'bg-card border border-border text-muted hover:text-foreground'
+            }`}
+          >
+            <Star className="w-3.5 h-3.5" />
+            Favoris ({jobs.filter((j) => j.status === 'saved').length})
+          </button>
+          <button
+            onClick={() => setJobFilter('applied')}
+            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5 ${
+              jobFilter === 'applied'
+                ? 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30'
+                : 'bg-card border border-border text-muted hover:text-foreground'
+            }`}
+          >
+            <CheckCircle className="w-3.5 h-3.5" />
+            Postulé ({jobs.filter((j) => j.status === 'applied').length})
+          </button>
+        </div>
+
+        {/* Score calculation */}
+        {jobs.length > 0 && (
+          <div className="flex items-center gap-3 ml-auto">
+            {scoreStats && (
+              <div className="flex gap-2 text-xs text-muted">
+                {scoreStats.pending > 0 && (
+                  <span>{scoreStats.pending} en attente</span>
+                )}
+                {scoreStats.calculating > 0 && (
+                  <span className="text-blue-400">{scoreStats.calculating} en cours...</span>
+                )}
+              </div>
+            )}
+            <Button
+              onClick={handleCalculateScores}
+              disabled={calculatingScores || (scoreStats?.pending === 0 && scoreStats?.error === 0)}
+              loading={calculatingScores}
+              size="sm"
+              className="gap-1.5"
+            >
+              {calculatingScores ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <Sparkles className="w-3.5 h-3.5" />
+              )}
+              Calculer scores
+            </Button>
+          </div>
+        )}
+      </div>
+
+      {/* Job List */}
+      {scraping ? (
+        <div className="flex flex-col items-center justify-center py-20">
+          <Loader2 className="w-8 h-8 animate-spin text-primary mb-4" />
+          <p className="text-muted">Recherche en cours...</p>
+          <p className="text-sm text-muted">Cela peut prendre un moment</p>
+        </div>
+      ) : loading ? (
+        <div className="flex items-center justify-center py-20">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        </div>
+      ) : jobs.length === 0 ? (
+        <Card className="text-center py-12">
+          <Search className="w-12 h-12 text-muted mx-auto mb-4" />
+          <h3 className="text-lg font-semibold text-foreground mb-2">Aucun job</h3>
+          <p className="text-muted">
+            Lancez une recherche pour découvrir des offres d&apos;emploi.
+          </p>
+        </Card>
+      ) : (
+        <div className="grid gap-4">
+          <AnimatePresence mode="popLayout">
+            {jobs
+              .filter((job) => {
+                if (jobFilter === 'all') return true
+                if (jobFilter === 'saved') return job.status === 'saved'
+                if (jobFilter === 'applied') return job.status === 'applied'
+                return true
+              })
+              .map((job) => (
+                <motion.div
+                  key={job._id}
+                  layout
+                  initial={false}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, x: -20 }}
                 >
-                  {calculatingScores ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      Calculating...
-                    </>
-                  ) : (
-                    <>
-                      <RefreshCw className="w-4 h-4" />
-                      Calculate Scores
-                    </>
-                  )}
-                </Button>
-              </div>
-            </Card>
-          )}
-
-          {loading ? (
-            <div className="flex items-center justify-center py-20">
-              <Loader2 className="w-8 h-8 animate-spin text-primary" />
-            </div>
-          ) : savedJobs.length === 0 ? (
-            <Card className="text-center py-12">
-              <Bookmark className="w-12 h-12 text-muted mx-auto mb-4" />
-              <h3 className="text-lg font-semibold text-foreground mb-2">No Saved Jobs</h3>
-              <p className="text-muted mb-4">
-                Save jobs from your search results to view them here.
+                  <JobCard job={job} showFavoriteButton showDeleteButton showApplyButton />
+                </motion.div>
+              ))}
+          </AnimatePresence>
+          {jobs.filter((job) => {
+            if (jobFilter === 'all') return true
+            if (jobFilter === 'saved') return job.status === 'saved'
+            if (jobFilter === 'applied') return job.status === 'applied'
+            return true
+          }).length === 0 && (
+            <Card className="text-center py-8">
+              <p className="text-muted">
+                Aucun job dans cette catégorie.
               </p>
-              <Button onClick={() => setActiveTab('search')} className="gap-2">
-                <Search className="w-4 h-4" />
-                Search Jobs
-              </Button>
             </Card>
-          ) : (
-            <div className="grid gap-4">
-              <AnimatePresence>
-                {savedJobs.map((job) => (
-                  <motion.div
-                    key={job._id}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, x: -20 }}
-                  >
-                    <JobCard job={job} showDeleteButton showApplyButton />
-                  </motion.div>
-                ))}
-              </AnimatePresence>
-            </div>
           )}
-        </>
+        </div>
       )}
 
       {/* Application Modal */}
