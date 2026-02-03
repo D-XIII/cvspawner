@@ -40,8 +40,23 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Check if application already exists for this job
+    if (body.jobId) {
+      const existingApplication = await Application.findOne({
+        userId: user!.id,
+        jobId: body.jobId,
+      })
+      if (existingApplication) {
+        return NextResponse.json(
+          { success: false, error: 'An application already exists for this job', existingId: existingApplication._id },
+          { status: 409 }
+        )
+      }
+    }
+
     const application = await Application.create({
       userId: user!.id,
+      jobId: body.jobId || undefined,
       company: body.company.trim(),
       position: body.position.trim(),
       location: body.location?.trim() || '',

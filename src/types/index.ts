@@ -59,6 +59,7 @@ export type ApplicationStatus = 'draft' | 'sent' | 'followed_up' | 'interview' |
 export interface Application {
   _id?: string
   userId?: string
+  jobId?: string
   company: string
   position: string
   location?: string

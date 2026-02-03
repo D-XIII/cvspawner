@@ -2,6 +2,7 @@ import mongoose, { Schema, Document, Model, Types } from 'mongoose'
 
 export interface IApplication extends Document {
   userId: Types.ObjectId
+  jobId?: Types.ObjectId
   company: string
   position: string
   location?: string
@@ -16,6 +17,7 @@ export interface IApplication extends Document {
 const ApplicationSchema = new Schema<IApplication>(
   {
     userId: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
+    jobId: { type: Schema.Types.ObjectId, ref: 'ScrapedJob', index: true },
     company: { type: String, required: true, trim: true },
     position: { type: String, required: true, trim: true },
     location: { type: String, trim: true },
@@ -29,6 +31,12 @@ const ApplicationSchema = new Schema<IApplication>(
     notes: { type: String, trim: true },
   },
   { timestamps: true }
+)
+
+// Ensure only one application per job per user
+ApplicationSchema.index(
+  { userId: 1, jobId: 1 },
+  { unique: true, partialFilterExpression: { jobId: { $exists: true, $ne: null } } }
 )
 
 const Application: Model<IApplication> =

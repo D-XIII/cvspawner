@@ -17,12 +17,16 @@ import {
   Filter,
   Sparkles,
   RefreshCw,
+  Send,
+  CheckCircle,
 } from 'lucide-react'
 import Card, { CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
+import Modal from '@/components/ui/Modal'
 import CompatibilityBadge from '@/components/jobs/CompatibilityBadge'
-import { ScrapedJob, ScrapeRequest } from '@/types'
+import ApplicationForm from '@/components/forms/ApplicationForm'
+import { ScrapedJob, ScrapeRequest, Application } from '@/types'
 
 const siteColors: Record<string, string> = {
   indeed: 'bg-blue-500/20 text-blue-400',
@@ -43,6 +47,12 @@ export default function JobsPage() {
   const [calculatingScores, setCalculatingScores] = useState(false)
   const [scoreStats, setScoreStats] = useState<{ pending: number; calculating: number; completed: number; error: number } | null>(null)
 
+  // Applications state
+  const [applicationsByJob, setApplicationsByJob] = useState<Record<string, Application>>({})
+  const [applicationModalOpen, setApplicationModalOpen] = useState(false)
+  const [selectedJobForApplication, setSelectedJobForApplication] = useState<ScrapedJob | null>(null)
+  const [editingApplication, setEditingApplication] = useState<Application | undefined>()
+
   // Search form state
   const [searchTerm, setSearchTerm] = useState('')
   const [location, setLocation] = useState('Switzerland')
@@ -53,6 +63,28 @@ export default function JobsPage() {
     fetchSavedJobs()
     fetchScoreStats()
   }, [])
+
+  // Fetch applications when saved jobs change
+  useEffect(() => {
+    if (savedJobs.length > 0) {
+      fetchApplicationsForJobs()
+    }
+  }, [savedJobs])
+
+  const fetchApplicationsForJobs = async () => {
+    const jobIds = savedJobs.map((job) => job._id).filter(Boolean)
+    if (jobIds.length === 0) return
+
+    try {
+      const res = await fetch(`/api/applications/by-job?jobIds=${jobIds.join(',')}`)
+      const data = await res.json()
+      if (data.success) {
+        setApplicationsByJob(data.data)
+      }
+    } catch {
+      console.error('Failed to fetch applications')
+    }
+  }
 
   // Poll for score updates when there are jobs being calculated
   useEffect(() => {
@@ -187,6 +219,66 @@ export default function JobsPage() {
     }
   }
 
+  const handleApplyToJob = (job: ScrapedJob) => {
+    const existingApp = job._id ? applicationsByJob[job._id] : undefined
+    if (existingApp) {
+      // Open modal to edit existing application
+      setEditingApplication(existingApp)
+      setSelectedJobForApplication(job)
+    } else {
+      // Create new application
+      setEditingApplication(undefined)
+      setSelectedJobForApplication(job)
+    }
+    setApplicationModalOpen(true)
+  }
+
+  const handleApplicationSubmit = async (formData: Partial<Application>) => {
+    try {
+      const isEditing = !!editingApplication
+      const url = isEditing
+        ? `/api/applications/${editingApplication._id}`
+        : '/api/applications'
+      const method = isEditing ? 'PUT' : 'POST'
+
+      const body = isEditing
+        ? formData
+        : {
+            ...formData,
+            jobId: selectedJobForApplication?._id,
+          }
+
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      const data = await res.json()
+
+      if (data.success) {
+        // Update local state
+        if (selectedJobForApplication?._id) {
+          setApplicationsByJob((prev) => ({
+            ...prev,
+            [selectedJobForApplication._id!]: data.data,
+          }))
+        }
+        setApplicationModalOpen(false)
+        setSelectedJobForApplication(null)
+        setEditingApplication(undefined)
+        setMessage({
+          type: 'success',
+          text: isEditing ? 'Application updated!' : 'Application created!',
+        })
+        setTimeout(() => setMessage(null), 3000)
+      } else {
+        setMessage({ type: 'error', text: data.error })
+      }
+    } catch {
+      setMessage({ type: 'error', text: 'Failed to save application' })
+    }
+  }
+
   const handleDeleteJob = async (id: string) => {
     if (!confirm('Remove this saved job?')) return
 
@@ -222,7 +314,11 @@ export default function JobsPage() {
     return `Up to ${currency} ${job.salaryMax?.toLocaleString()}`
   }
 
-  const JobCard = ({ job, showSaveButton = false, showDeleteButton = false }: { job: ScrapedJob; showSaveButton?: boolean; showDeleteButton?: boolean }) => (
+  const JobCard = ({ job, showSaveButton = false, showDeleteButton = false, showApplyButton = false }: { job: ScrapedJob; showSaveButton?: boolean; showDeleteButton?: boolean; showApplyButton?: boolean }) => {
+    const application = job._id ? applicationsByJob[job._id] : undefined
+    const hasApplied = !!application
+
+    return (
     <Card hover>
       <CardHeader>
         <div className="flex justify-between items-start">
@@ -235,6 +331,12 @@ export default function JobsPage() {
               {job.isRemote && (
                 <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-green-500/20 text-green-400">
                   Remote
+                </span>
+              )}
+              {hasApplied && (
+                <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-500/20 text-indigo-400 flex items-center gap-1">
+                  <CheckCircle className="w-3 h-3" />
+                  Applied
                 </span>
               )}
               {job._id && (
@@ -334,9 +436,21 @@ export default function JobsPage() {
             Remove
           </Button>
         )}
+        {showApplyButton && (
+          <Button
+            variant={hasApplied ? 'secondary' : 'primary'}
+            size="sm"
+            onClick={() => handleApplyToJob(job)}
+            className="gap-1"
+          >
+            <Send className="w-3 h-3" />
+            {hasApplied ? 'View Application' : 'Apply'}
+          </Button>
+        )}
       </CardFooter>
     </Card>
   )
+  }
 
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -569,7 +683,7 @@ export default function JobsPage() {
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, x: -20 }}
                   >
-                    <JobCard job={job} showDeleteButton />
+                    <JobCard job={job} showDeleteButton showApplyButton />
                   </motion.div>
                 ))}
               </AnimatePresence>
@@ -577,6 +691,34 @@ export default function JobsPage() {
           )}
         </>
       )}
+
+      {/* Application Modal */}
+      <Modal
+        isOpen={applicationModalOpen}
+        onClose={() => {
+          setApplicationModalOpen(false)
+          setSelectedJobForApplication(null)
+          setEditingApplication(undefined)
+        }}
+        title={editingApplication ? 'Edit Application' : 'Apply to Job'}
+        size="lg"
+      >
+        <ApplicationForm
+          application={editingApplication || (selectedJobForApplication ? {
+            company: selectedJobForApplication.company,
+            position: selectedJobForApplication.title,
+            location: selectedJobForApplication.location || '',
+            url: selectedJobForApplication.jobUrl || '',
+            status: 'draft',
+          } as Application : undefined)}
+          onSubmit={handleApplicationSubmit}
+          onCancel={() => {
+            setApplicationModalOpen(false)
+            setSelectedJobForApplication(null)
+            setEditingApplication(undefined)
+          }}
+        />
+      </Modal>
     </div>
   )
 }
