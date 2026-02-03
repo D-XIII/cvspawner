@@ -323,7 +323,7 @@ def find_matching_keywords(cv_data: dict, job_keywords: list[str]) -> tuple[list
     if not job_keywords:
         return [], []
 
-    # Build CV text for searching
+    # Build CV text for searching - include all relevant fields
     cv_parts = []
 
     profile = cv_data.get("profile")
@@ -336,22 +336,45 @@ def find_matching_keywords(cv_data: dict, job_keywords: list[str]) -> tuple[list
     for exp in cv_data.get("experiences", []):
         if exp.get("title"):
             cv_parts.append(exp["title"])
+        if exp.get("company"):
+            cv_parts.append(exp["company"])
         if exp.get("description"):
             cv_parts.append(exp["description"])
 
     for skill in cv_data.get("skills", []):
         if skill.get("name"):
             cv_parts.append(skill["name"])
+        if skill.get("category"):
+            cv_parts.append(skill["category"])
 
     cv_text_lower = " ".join(cv_parts).lower()
+
+    # Also build a set of individual words for partial matching
+    cv_words = set()
+    for part in cv_parts:
+        cv_words.update(part.lower().split())
 
     matched = []
     missing = []
 
     for keyword in job_keywords:
         keyword_lower = keyword.lower()
-        # Check for exact match or partial match
-        if keyword_lower in cv_text_lower or any(keyword_lower in part.lower() for part in cv_parts):
+        keyword_words = keyword_lower.split()
+
+        # Check for:
+        # 1. Exact substring match in full text
+        # 2. Any word from multi-word keyword present in CV
+        # 3. Partial match (keyword contained in a CV word or vice versa)
+        is_matched = False
+
+        if keyword_lower in cv_text_lower:
+            is_matched = True
+        elif any(kw in cv_text_lower for kw in keyword_words):
+            is_matched = True
+        elif any(keyword_lower in word or word in keyword_lower for word in cv_words if len(word) > 2):
+            is_matched = True
+
+        if is_matched:
             matched.append(keyword)
         else:
             missing.append(keyword)
@@ -390,9 +413,22 @@ def calculate_detailed_score(cv_data: dict, job: dict, threshold: float = 50.0) 
     # Find matched and missing keywords
     matched_keywords, missing_keywords = find_matching_keywords(cv_data, job_keywords)
 
-    # Get user's skills that match
+    # Get user's skills that match any job keyword
     user_skills = [s.get("name") for s in cv_data.get("skills", []) if s.get("name")]
-    matched_skills = [s for s in user_skills if any(s.lower() in kw.lower() or kw.lower() in s.lower() for kw in job_keywords)]
+    matched_skills = []
+    for skill in user_skills:
+        skill_lower = skill.lower()
+        skill_words = skill_lower.split()
+        for kw in job_keywords:
+            kw_lower = kw.lower()
+            # Match if skill contains keyword, keyword contains skill, or any word matches
+            if (skill_lower in kw_lower or
+                kw_lower in skill_lower or
+                any(sw in kw_lower for sw in skill_words) or
+                any(kw_lower in sw for sw in skill_words)):
+                if skill not in matched_skills:
+                    matched_skills.append(skill)
+                break
 
     return {
         "globalScore": global_score,
