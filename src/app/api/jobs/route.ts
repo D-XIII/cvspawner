@@ -54,6 +54,9 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // If score was already calculated during scraping, use it
+    const hasScore = typeof body.compatibilityScore === 'number'
+
     const jobData = {
       userId: user!.id,
       title: body.title.trim(),
@@ -69,8 +72,10 @@ export async function POST(request: NextRequest) {
       isRemote: Boolean(body.isRemote),
       site: body.site.trim(),
       savedAt: new Date(),
-      // Initialize score status as pending
-      scoreStatus: 'pending',
+      // Use existing score if provided, otherwise mark as pending
+      compatibilityScore: hasScore ? body.compatibilityScore : undefined,
+      scoreStatus: hasScore ? 'completed' : 'pending',
+      scoreCalculatedAt: hasScore ? new Date() : undefined,
     }
 
     const job = await ScrapedJob.create(jobData)

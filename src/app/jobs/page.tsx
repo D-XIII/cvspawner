@@ -339,7 +339,7 @@ export default function JobsPage() {
                   Applied
                 </span>
               )}
-              {job._id && (
+              {(job._id || job.compatibilityScore !== undefined) && (
                 <CompatibilityBadge
                   score={job.compatibilityScore}
                   status={job.scoreStatus}
