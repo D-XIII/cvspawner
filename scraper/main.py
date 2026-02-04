@@ -13,6 +13,12 @@ from scoring import (
     calculate_detailed_score,
     get_model_status,
 )
+from tech_keywords import (
+    build_tfidf_index,
+    load_tech_terms,
+    get_idf_score,
+    _idf_scores,
+)
 
 app = FastAPI(title="JobSpy Scraper API", version="1.0.0")
 
@@ -126,11 +132,16 @@ class ExperienceMatch(BaseModel):
 
 class DetailedScoreResponse(BaseModel):
     globalScore: float
+    semanticScore: Optional[float] = None
+    keywordScore: Optional[float] = None
     experienceMatches: List[ExperienceMatch]
     matchedKeywords: List[str]
+    matchedTechnical: Optional[List[str]] = None
     missingKeywords: List[str]
+    missingTechnical: Optional[List[str]] = None
     matchedSkills: List[str]
     totalKeywords: int
+    technicalKeywords: Optional[int] = None
     message: Optional[str] = None
 
 
@@ -208,6 +219,75 @@ async def model_status():
     """Check if the ML model is loaded."""
     status = get_model_status()
     return status
+
+
+class TfidfBuildRequest(BaseModel):
+    job_descriptions: List[str] = Field(..., description="List of job descriptions to build TF-IDF index from")
+
+
+@app.post("/build-tfidf")
+async def build_tfidf_endpoint(request: TfidfBuildRequest):
+    """
+    Build TF-IDF index from job descriptions.
+
+    This allows the scoring system to identify technical terms based on
+    their frequency across your job corpus. Terms that appear in few jobs
+    are considered more technical/specific.
+    """
+    try:
+        if not request.job_descriptions:
+            raise HTTPException(status_code=400, detail="No job descriptions provided")
+
+        # Filter out empty descriptions
+        descriptions = [d for d in request.job_descriptions if d and d.strip()]
+
+        if not descriptions:
+            raise HTTPException(status_code=400, detail="All job descriptions are empty")
+
+        build_tfidf_index(descriptions)
+
+        # Get some stats
+        num_terms = len(_idf_scores) if _idf_scores else 0
+
+        # Get top technical terms (highest IDF)
+        top_technical = []
+        if _idf_scores:
+            sorted_terms = sorted(_idf_scores.items(), key=lambda x: x[1], reverse=True)
+            top_technical = [t[0] for t in sorted_terms[:20]]
+
+        return {
+            "success": True,
+            "message": f"TF-IDF index built from {len(descriptions)} job descriptions",
+            "total_terms": num_terms,
+            "top_technical_terms": top_technical
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to build TF-IDF index: {str(e)}")
+
+
+@app.get("/tfidf-status")
+async def tfidf_status():
+    """Check TF-IDF index status and get sample technical terms."""
+    tech_terms = load_tech_terms()
+
+    tfidf_built = _idf_scores is not None and len(_idf_scores) > 0
+    num_idf_terms = len(_idf_scores) if _idf_scores else 0
+
+    # Sample high-IDF terms if available
+    high_idf_terms = []
+    if _idf_scores:
+        sorted_terms = sorted(_idf_scores.items(), key=lambda x: x[1], reverse=True)
+        high_idf_terms = [{"term": t[0], "idf": round(t[1], 2)} for t in sorted_terms[:15]]
+
+    return {
+        "stackoverflow_tags_loaded": len(tech_terms),
+        "tfidf_index_built": tfidf_built,
+        "tfidf_terms_count": num_idf_terms,
+        "high_idf_terms": high_idf_terms
+    }
 
 
 @app.post("/score", response_model=ScoreResponse)
@@ -326,13 +406,18 @@ async def score_job_detailed(request: ScoreRequest):
 
         return DetailedScoreResponse(
             globalScore=result["globalScore"],
+            semanticScore=result.get("semanticScore"),
+            keywordScore=result.get("keywordScore"),
             experienceMatches=[
                 ExperienceMatch(**exp) for exp in result["experienceMatches"]
             ],
             matchedKeywords=result["matchedKeywords"],
+            matchedTechnical=result.get("matchedTechnical"),
             missingKeywords=result["missingKeywords"],
+            missingTechnical=result.get("missingTechnical"),
             matchedSkills=result["matchedSkills"],
-            totalKeywords=result["totalKeywords"]
+            totalKeywords=result["totalKeywords"],
+            technicalKeywords=result.get("technicalKeywords")
         )
 
     except Exception as e:
