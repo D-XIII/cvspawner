@@ -18,7 +18,13 @@ export async function POST() {
 
     // Get all job descriptions from the database
     const jobs = await ScrapedJob.find(
-      { description: { $exists: true, $ne: null, $ne: "" } },
+      {
+        description: { $exists: true },
+        $and: [
+          { description: { $ne: null } },
+          { description: { $ne: "" } }
+        ]
+      },
       { description: 1 }
     ).lean();
 
