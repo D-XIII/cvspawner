@@ -12,7 +12,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application code
-COPY main.py scoring.py ./
+COPY main.py scoring.py tech_keywords.py ./
 
 # Expose port
 EXPOSE 8000
