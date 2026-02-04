@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { connectDB } from "@/lib/mongodb";
+import { connectToDatabase } from "@/lib/mongodb";
 import ScrapedJob from "@/models/ScrapedJob";
 
 const SCRAPER_URL = process.env.SCRAPER_URL || "http://localhost:8000";
@@ -14,7 +14,7 @@ export async function POST() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    await connectDB();
+    await connectToDatabase();
 
     // Get all job descriptions from the database
     const jobs = await ScrapedJob.find(
