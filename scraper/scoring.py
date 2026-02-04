@@ -1,12 +1,23 @@
 """
 Scoring service for CV-Job compatibility using Sentence Transformers.
 Uses the paraphrase-multilingual-MiniLM-L12-v2 model for multilingual support.
+Enhanced with technical keyword detection for better scoring accuracy.
 """
 
 from typing import Optional
 from sentence_transformers import SentenceTransformer
 from sentence_transformers.util import cos_sim
 import threading
+
+# Import technical keyword detection
+from tech_keywords import (
+    is_technical_term,
+    get_technical_weight,
+    extract_technical_keywords,
+    classify_keywords,
+    SOFT_SKILLS_STOPWORDS,
+    load_tech_terms,
+)
 
 # Model configuration
 MODEL_NAME = "paraphrase-multilingual-MiniLM-L12-v2"
@@ -190,60 +201,56 @@ def calculate_batch_scores(cv_text: str, jobs: list[dict]) -> list[dict]:
 import re
 
 
-def extract_keywords(text: str, max_keywords: int = 20) -> list[str]:
+def extract_keywords(text: str, max_keywords: int = 20, technical_only: bool = False) -> list[str]:
     """
-    Extract technical keywords and proper nouns from text.
+    Extract technical keywords from text using Stack Overflow tags and IDF scoring.
+
+    Args:
+        text: Text to extract keywords from
+        max_keywords: Maximum number of keywords to return
+        technical_only: If True, only return technical keywords
+
+    Returns:
+        List of unique keywords (technical keywords first)
+    """
+    if not text:
+        return []
+
+    # Use the new technical keyword extraction
+    extracted = extract_technical_keywords(text, max_keywords=max_keywords * 2)
+
+    if technical_only:
+        # Only return technical keywords
+        keywords = [kw["keyword"] for kw in extracted if kw["is_technical"]]
+    else:
+        # Return all, but technical first (already sorted by weight)
+        keywords = [kw["keyword"] for kw in extracted]
+
+    # Also extract years of experience patterns (always useful)
+    years_exp = re.findall(r'(\d+\+?\s*(?:years?|ans?)\s*(?:of\s+)?(?:experience|expérience)?)', text, re.IGNORECASE)
+    for exp in years_exp:
+        exp_clean = exp.strip()
+        if exp_clean and exp_clean not in keywords:
+            keywords.append(exp_clean)
+
+    return keywords[:max_keywords]
+
+
+def extract_keywords_weighted(text: str, max_keywords: int = 20) -> list[dict]:
+    """
+    Extract keywords with their technical weight.
 
     Args:
         text: Text to extract keywords from
         max_keywords: Maximum number of keywords to return
 
     Returns:
-        List of unique keywords
+        List of dicts with 'keyword', 'is_technical', 'weight'
     """
     if not text:
         return []
 
-    # Common tech keywords pattern (languages, frameworks, tools)
-    tech_patterns = [
-        # Programming languages
-        r'\b(Python|JavaScript|TypeScript|Java|C\+\+|C#|Go|Rust|Ruby|PHP|Swift|Kotlin|Scala|R)\b',
-        # Frameworks & Libraries
-        r'\b(React|Angular|Vue|Next\.?js|Node\.?js|Django|Flask|FastAPI|Spring|Rails|Laravel|Express)\b',
-        # Databases
-        r'\b(MongoDB|PostgreSQL|MySQL|Redis|Elasticsearch|SQLite|Oracle|Cassandra|DynamoDB)\b',
-        # Cloud & DevOps
-        r'\b(AWS|Azure|GCP|Docker|Kubernetes|K8s|Terraform|Jenkins|GitLab|GitHub|CI/CD)\b',
-        # Tools & Concepts
-        r'\b(Git|REST|GraphQL|API|Agile|Scrum|TDD|DevOps|Microservices|Linux|Unix)\b',
-        # Data & ML
-        r'\b(Machine Learning|ML|AI|Deep Learning|TensorFlow|PyTorch|Pandas|NumPy|SQL|NoSQL)\b',
-    ]
-
-    keywords = set()
-    text_lower = text.lower()
-
-    # Extract tech keywords (case-insensitive matching, preserve original case)
-    for pattern in tech_patterns:
-        matches = re.findall(pattern, text, re.IGNORECASE)
-        for match in matches:
-            keywords.add(match)
-
-    # Extract capitalized words (potential proper nouns, tools, acronyms)
-    # Match words with 2+ uppercase letters or starting with uppercase
-    capitalized = re.findall(r'\b([A-Z][a-zA-Z]*(?:\s+[A-Z][a-zA-Z]*)?)\b', text)
-    for word in capitalized:
-        # Filter out common words and short words
-        if len(word) > 2 and word.lower() not in {'the', 'and', 'for', 'with', 'are', 'you', 'our', 'will', 'can', 'has', 'have', 'this', 'that', 'from', 'they', 'been', 'would', 'could', 'should', 'about', 'into', 'your', 'their', 'what', 'when', 'where', 'which', 'who', 'how', 'all', 'each', 'other', 'some', 'such', 'than', 'then', 'these', 'those', 'very', 'just', 'over', 'also', 'after', 'before', 'more', 'most', 'only', 'same', 'any', 'both', 'few', 'own', 'well', 'back', 'being', 'experience', 'working', 'work', 'team', 'company', 'position', 'role', 'job', 'years', 'year', 'ability', 'skills', 'strong', 'good', 'great', 'excellent'}:
-            keywords.add(word)
-
-    # Extract years of experience patterns
-    years_exp = re.findall(r'(\d+\+?\s*(?:years?|ans?)\s*(?:of\s+)?(?:experience|expérience)?)', text, re.IGNORECASE)
-    for exp in years_exp:
-        keywords.add(exp.strip())
-
-    # Limit and return
-    return list(keywords)[:max_keywords]
+    return extract_technical_keywords(text, max_keywords=max_keywords)
 
 
 def calculate_experience_scores(experiences: list[dict], job_text: str, threshold: float = 50.0) -> list[dict]:
@@ -382,9 +389,43 @@ def find_matching_keywords(cv_data: dict, job_keywords: list[str]) -> tuple[list
     return matched, missing
 
 
+def calculate_weighted_keyword_score(matched_keywords: list[str], missing_keywords: list[str]) -> float:
+    """
+    Calculate a weighted score based on technical keyword matches.
+    Technical keywords have higher weight than generic terms.
+
+    Args:
+        matched_keywords: Keywords found in CV
+        missing_keywords: Keywords not found in CV
+
+    Returns:
+        Score between 0 and 100
+    """
+    if not matched_keywords and not missing_keywords:
+        return 50.0  # No keywords to compare
+
+    total_weight = 0.0
+    matched_weight = 0.0
+
+    for kw in matched_keywords:
+        weight = get_technical_weight(kw)
+        matched_weight += weight
+        total_weight += weight
+
+    for kw in missing_keywords:
+        weight = get_technical_weight(kw)
+        total_weight += weight
+
+    if total_weight == 0:
+        return 50.0
+
+    return round((matched_weight / total_weight) * 100, 1)
+
+
 def calculate_detailed_score(cv_data: dict, job: dict, threshold: float = 50.0) -> dict:
     """
     Calculate detailed compatibility score with explanations.
+    Uses weighted technical keyword matching for more accurate scores.
 
     Args:
         cv_data: CV data dict with profile, experiences, skills
@@ -397,21 +438,36 @@ def calculate_detailed_score(cv_data: dict, job: dict, threshold: float = 50.0) 
     cv_text = prepare_cv_text(cv_data)
     job_text = prepare_job_text(job)
 
-    # Calculate global score
-    global_score = calculate_score(cv_text, job_text)
+    # Calculate semantic similarity score
+    semantic_score = calculate_score(cv_text, job_text)
 
     # Calculate experience scores
     experiences = cv_data.get("experiences", [])
     experience_matches = calculate_experience_scores(experiences, job_text, threshold)
 
-    # Extract job keywords
+    # Extract job keywords (technical keywords prioritized)
     job_description = job.get("description", "")
     job_title = job.get("title", "")
     job_full_text = f"{job_title} {job_description}"
-    job_keywords = extract_keywords(job_full_text)
+
+    # Get weighted keywords
+    job_keywords_weighted = extract_keywords_weighted(job_full_text, max_keywords=30)
+    job_keywords = [kw["keyword"] for kw in job_keywords_weighted]
+
+    # Separate technical and non-technical keywords for reporting
+    technical_keywords = [kw["keyword"] for kw in job_keywords_weighted if kw["is_technical"]]
+    non_technical_keywords = [kw["keyword"] for kw in job_keywords_weighted if not kw["is_technical"]]
 
     # Find matched and missing keywords
     matched_keywords, missing_keywords = find_matching_keywords(cv_data, job_keywords)
+
+    # Separate matched technical vs non-technical
+    matched_technical = [kw for kw in matched_keywords if is_technical_term(kw)]
+    matched_non_technical = [kw for kw in matched_keywords if not is_technical_term(kw)]
+    missing_technical = [kw for kw in missing_keywords if is_technical_term(kw)]
+
+    # Calculate weighted keyword score (technical keywords count more)
+    keyword_score = calculate_weighted_keyword_score(matched_keywords, missing_keywords)
 
     # Get user's skills that match any job keyword
     user_skills = [s.get("name") for s in cv_data.get("skills", []) if s.get("name")]
@@ -430,11 +486,21 @@ def calculate_detailed_score(cv_data: dict, job: dict, threshold: float = 50.0) 
                     matched_skills.append(skill)
                 break
 
+    # Calculate final weighted score:
+    # - 40% semantic similarity (general context match)
+    # - 60% weighted keyword match (technical skills matter more)
+    global_score = round(semantic_score * 0.4 + keyword_score * 0.6, 1)
+
     return {
         "globalScore": global_score,
+        "semanticScore": semantic_score,
+        "keywordScore": keyword_score,
         "experienceMatches": experience_matches,
         "matchedKeywords": matched_keywords,
+        "matchedTechnical": matched_technical,
         "missingKeywords": missing_keywords,
+        "missingTechnical": missing_technical,
         "matchedSkills": matched_skills,
-        "totalKeywords": len(job_keywords)
+        "totalKeywords": len(job_keywords),
+        "technicalKeywords": len(technical_keywords)
     }
